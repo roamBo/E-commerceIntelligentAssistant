@@ -4,18 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="befb3e93-f498-45aa-b478-16b2070b41c1" name="更改" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/E-commerceIntelligentAssistant.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/E-commerceIntelligentAssistant.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/compiler.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/compiler.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/encodings.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/jarRepositories.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/python-agents/t.txt" beforeDir="false" afterPath="$PROJECT_DIR$/python-agents/requirements.txt" afterDir="false" />
-    </list>
+    <list default="true" id="befb3e93-f498-45aa-b478-16b2070b41c1" name="更改" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -69,7 +58,7 @@
       <updated>1751419999075</updated>
       <workItem from="1751420000495" duration="45000" />
       <workItem from="1751425650890" duration="3000" />
-      <workItem from="1751438588862" duration="1880000" />
+      <workItem from="1751438588862" duration="2476000" />
     </task>
     <servers />
   </component>
