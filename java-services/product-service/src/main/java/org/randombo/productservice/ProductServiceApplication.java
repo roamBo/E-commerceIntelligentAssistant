@@ -10,7 +10,7 @@ import org.springframework.web.client.RestTemplate;
 @SpringBootApplication                 // 启动 Spring Boot 自动配置
 @EnableDiscoveryClient                // 开启服务注册/发现（Nacos、Eureka 等）
 @EnableFeignClients(basePackages = {  // 开启 Feign，扫描接口包
-		"org.randombo.api"            // 你放 Feign Client 接口的包，可自行修改
+		// "org.randombo.api"            // 你放 Feign Client 接口的包，可自行修改
 })
 public class ProductServiceApplication {
 
