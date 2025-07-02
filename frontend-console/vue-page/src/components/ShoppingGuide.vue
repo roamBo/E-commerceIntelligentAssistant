@@ -713,7 +713,7 @@ onMounted(() => {
   line-height: 1.4;
 }
 
-/* 响应式设计 */
+/* 增强响应式布局 */
 @media (max-width: 1200px) {
   .side-panel {
     position: relative;
@@ -722,12 +722,22 @@ onMounted(() => {
     flex-direction: row;
     justify-content: center;
     gap: 20px;
-    margin-top: 20px;
-    margin-bottom: 20px;
+    margin: 20px auto;
+    width: 90%;
+    max-width: 900px;
+  }
+  
+  .side-card {
+    width: calc(33.33% - 14px);
   }
 }
 
 @media (max-width: 768px) {
+  .chat-container {
+    border-radius: 0;
+    max-width: 100%;
+  }
+  
   .message-item {
     max-width: 95%;
   }
@@ -735,6 +745,93 @@ onMounted(() => {
   .side-panel {
     flex-direction: column;
     align-items: center;
+    width: 100%;
+  }
+  
+  .side-card {
+    width: 90%;
+    max-width: 300px;
+  }
+  
+  .chat-header {
+    padding: 12px 16px;
+  }
+  
+  .chat-header h2 {
+    font-size: 18px;
+  }
+  
+  .chat-body {
+    padding: 16px;
+    gap: 16px;
+  }
+  
+  .chat-input {
+    padding: 16px;
+  }
+  
+  .welcome-message {
+    flex-direction: column;
+    padding: 20px 15px;
+  }
+  
+  .ai-avatar, .user-avatar {
+    margin: 0 auto 15px auto;
+  }
+  
+  .quick-actions {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .product-card {
+    flex-direction: column;
+  }
+}
+
+/* 对于更小的屏幕 */
+@media (max-width: 480px) {
+  .chat-header h2 {
+    font-size: 16px;
+  }
+  
+  .chat-body {
+    padding: 12px;
+    gap: 12px;
+  }
+  
+  .message-content {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+  
+  .welcome-content h3 {
+    font-size: 16px;
+  }
+  
+  .welcome-hint {
+    font-size: 13px;
+  }
+  
+  .quick-actions .el-button {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+  
+  .side-panel {
+    margin: 15px auto;
+  }
+  
+  .side-card {
+    padding: 12px;
+  }
+  
+  .side-title {
+    font-size: 14px;
+  }
+  
+  .side-desc {
+    font-size: 11px;
   }
 }
 </style> 

@@ -200,22 +200,25 @@ const getTotalAmount = (order) => {
 }
 
 .order-manager {
-  padding: 24px;
+  width: 100%;
   height: 100%;
-  overflow-y: auto;
-  background: #f5f7fa;
+  padding: 20px;
+  background: linear-gradient(135deg, #1a2035 0%, #101425 100%);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .order-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .order-header h2 {
   font-size: 24px;
-  color: #303133;
+  color: #64ffda;
   margin: 0;
 }
 
@@ -356,5 +359,67 @@ const getTotalAmount = (order) => {
 .order-actions {
   display: flex;
   gap: 8px;
+}
+
+.filter-controls {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 20px;
+  flex-wrap: wrap; /* 允许在小屏幕上换行 */
+}
+
+.data-table {
+  flex: 1;
+  overflow: auto; /* 确保表格内容可滚动 */
+  border-radius: 10px;
+  background: rgba(30, 38, 60, 0.5);
+  padding: 15px;
+  border: 1px solid rgba(100, 255, 218, 0.1);
+}
+
+/* 添加响应式设计 */
+@media (max-width: 768px) {
+  .order-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  
+  .filter-controls {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .filter-controls .el-select,
+  .filter-controls .el-date-picker {
+    width: 100% !important;
+    margin-bottom: 10px;
+  }
+  
+  .data-table {
+    overflow-x: auto; /* 确保表格可以水平滚动 */
+  }
+  
+  /* 调整表格在小屏幕上的显示 */
+  :deep(.el-table) {
+    width: 100%;
+    overflow-x: auto;
+  }
+  
+  :deep(.el-table__body),
+  :deep(.el-table__header) {
+    min-width: 600px; /* 确保表格有最小宽度 */
+  }
+}
+
+/* 对于非常小的屏幕 */
+@media (max-width: 480px) {
+  .order-manager {
+    padding: 10px;
+  }
+  
+  .order-header h2 {
+    font-size: 20px;
+  }
 }
 </style> 
