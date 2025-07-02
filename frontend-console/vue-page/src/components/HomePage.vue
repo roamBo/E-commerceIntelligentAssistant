@@ -2,6 +2,13 @@
   <div class="home-container">
     <!-- 主标语区域 -->
     <div class="hero-section">
+      <!-- 添加装饰元素 -->
+      <div class="hero-decoration dot-grid"></div>
+      <div class="hero-decoration wave"></div>
+      <div class="hero-decoration circle"></div>
+      <div class="hero-decoration square"></div>
+      <div class="hero-decoration triangle"></div>
+      
       <div class="slogan-wrapper">
         <h2 class="sub-heading">你梦想的智能助手</h2>
         <h1 class="main-heading">让你的购物体验更上一层楼</h1>
@@ -182,6 +189,155 @@ html, body {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 添加hero section的背景装饰元素 */
+.hero-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(circle at 10% 10%, rgba(64, 158, 255, 0.06) 0%, transparent 25%),
+    radial-gradient(circle at 90% 90%, rgba(103, 194, 58, 0.06) 0%, transparent 25%),
+    radial-gradient(circle at 50% 50%, rgba(245, 108, 108, 0.03) 0%, transparent 30%);
+  z-index: 0;
+}
+
+.hero-section::after {
+  content: '';
+  position: absolute;
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(64, 158, 255, 0.05) 0%, rgba(103, 194, 58, 0.05) 100%);
+  top: -150px;
+  right: -150px;
+  animation: floatCircle 15s infinite linear;
+  z-index: 0;
+}
+
+@keyframes floatCircle {
+  0% {
+    transform: rotate(0deg) translateX(0) translateY(0);
+  }
+  25% {
+    transform: rotate(90deg) translateX(30px) translateY(30px);
+  }
+  50% {
+    transform: rotate(180deg) translateX(0) translateY(60px);
+  }
+  75% {
+    transform: rotate(270deg) translateX(-30px) translateY(30px);
+  }
+  100% {
+    transform: rotate(360deg) translateX(0) translateY(0);
+  }
+}
+
+/* 装饰性元素 */
+.hero-decoration {
+  position: absolute;
+  z-index: 0;
+  opacity: 0.6;
+}
+
+.hero-decoration.dot-grid {
+  width: 200px;
+  height: 200px;
+  background-image: radial-gradient(rgba(103, 194, 58, 0.3) 1px, transparent 1px);
+  background-size: 16px 16px;
+  left: 5%;
+  bottom: 15%;
+  border-radius: 8px;
+  transform: rotate(-15deg);
+}
+
+.hero-decoration.wave {
+  width: 150px;
+  height: 50px;
+  right: 10%;
+  top: 20%;
+  background-image: 
+    linear-gradient(90deg, rgba(64, 158, 255, 0) 0%, rgba(64, 158, 255, 0.2) 50%, rgba(64, 158, 255, 0) 100%);
+  filter: blur(20px);
+  animation: waveMove 8s infinite ease-in-out;
+}
+
+@keyframes waveMove {
+  0%, 100% {
+    transform: translateX(-30px) translateY(0);
+  }
+  50% {
+    transform: translateX(30px) translateY(20px);
+  }
+}
+
+.hero-decoration.circle {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 2px solid rgba(64, 158, 255, 0.1);
+  left: 15%;
+  top: 20%;
+  animation: float 12s infinite ease-in-out;
+}
+
+.hero-decoration.square {
+  width: 80px;
+  height: 80px;
+  border: 2px solid rgba(103, 194, 58, 0.1);
+  right: 20%;
+  bottom: 20%;
+  animation: rotateAndFloat 20s infinite linear;
+}
+
+@keyframes rotateAndFloat {
+  0% {
+    transform: rotate(0deg) translateY(0);
+  }
+  25% {
+    transform: rotate(90deg) translateY(-15px);
+  }
+  50% {
+    transform: rotate(180deg) translateY(0);
+  }
+  75% {
+    transform: rotate(270deg) translateY(15px);
+  }
+  100% {
+    transform: rotate(360deg) translateY(0);
+  }
+}
+
+.hero-decoration.triangle {
+  width: 0;
+  height: 0;
+  border-left: 50px solid transparent;
+  border-right: 50px solid transparent;
+  border-bottom: 80px solid rgba(245, 108, 108, 0.05);
+  position: absolute;
+  left: 30%;
+  top: 60%;
+  animation: float 18s infinite ease-in-out reverse;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+.slogan-wrapper, .advantages {
+  position: relative;
+  z-index: 1;
 }
 
 .features-section {
@@ -212,6 +368,19 @@ html, body {
   color: #2c3e50;
   font-weight: bold;
   margin-bottom: 40px;
+  position: relative;
+  z-index: 1;
+}
+
+.main-heading::after {
+  content: '';
+  position: absolute;
+  width: 60px;
+  height: 4px;
+  background: linear-gradient(90deg, #409EFF, #67C23A);
+  bottom: -12px;
+  left: 0;
+  border-radius: 2px;
 }
 
 .advantages {
@@ -259,6 +428,18 @@ html, body {
   justify-content: center;
   margin: 0 auto 20px;
   box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+  position: relative;
+}
+
+.advantage-icon::before {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: rgba(64, 158, 255, 0.05);
+  border-radius: 50%;
+  transform: scale(1.2);
+  z-index: -1;
 }
 
 .advantage-icon .emoji-icon {
@@ -479,6 +660,42 @@ html, body {
   .features-section {
     padding: 40px 20px; /* 移动端更紧凑 */
   }
+  
+  .hero-decoration.dot-grid {
+    width: 150px;
+    height: 150px;
+    left: 5%;
+    bottom: 10%;
+  }
+  
+  .hero-decoration.circle {
+    width: 80px;
+    height: 80px;
+    left: 10%;
+    top: 15%;
+  }
+  
+  .hero-decoration.square {
+    width: 60px;
+    height: 60px;
+    right: 10%;
+    bottom: 15%;
+  }
+  
+  .hero-decoration.triangle {
+    border-left: 30px solid transparent;
+    border-right: 30px solid transparent;
+    border-bottom: 50px solid rgba(245, 108, 108, 0.05);
+    left: 25%;
+    top: 65%;
+  }
+  
+  .hero-decoration.wave {
+    width: 100px;
+    height: 40px;
+    right: 8%;
+    top: 25%;
+  }
 }
 
 /* 滚动条整体样式 */
@@ -591,6 +808,14 @@ html, body {
   
   .scroll-emoji {
     font-size: 20px;
+  }
+}
+
+/* 确保动画在低性能设备上不会造成性能问题 */
+@media (prefers-reduced-motion: reduce) {
+  .hero-section::after,
+  .hero-decoration {
+    animation: none !important;
   }
 }
 </style> 
