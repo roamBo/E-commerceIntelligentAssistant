@@ -4,7 +4,7 @@
       <div class="chat-header">
         <h2>个性化导购助手</h2>
         <el-button 
-          v-if="chatMessages.length > 0" 
+          v-if="messages.length > 0" 
           type="text" 
           icon="el-icon-delete" 
           @click="clearChat"
@@ -13,117 +13,52 @@
       </div>
       <div class="chat-body" ref="chatBody">
         <!-- 欢迎消息 -->
-        <div class="welcome-message" v-if="chatMessages.length === 0">
-                     <div class="ai-avatar">
+        <div class="welcome-message" v-if="messages.length === 0">
+          <div class="ai-avatar">
             <span class="emoji-avatar">🤖</span>
           </div>
           <div class="welcome-content">
             <h3>您好！我是您的个性化导购助手</h3>
             <p class="welcome-hint">您可以直接告诉我您需要什么商品，我将帮您完成推荐商品、购买下单、支付和物流跟踪的全流程服务。</p>
             <div class="quick-actions">
-              <el-button size="small" @click="sendQuickMessage('如何使用这个导购助手？')">如何使用导购助手</el-button>
-              <el-button size="small" @click="sendQuickMessage('你能提供哪些服务？')">查看服务范围</el-button>
-              <el-button size="small" @click="sendQuickMessage('联系客服')">联系客服</el-button>
+              <el-button size="small" @click="quickSend('如何使用这个导购助手？')">如何使用导购助手</el-button>
+              <el-button size="small" @click="quickSend('你能提供哪些服务？')">查看服务范围</el-button>
+              <el-button size="small" @click="quickSend('联系客服')">联系客服</el-button>
             </div>
           </div>
         </div>
         
         <!-- 聊天消息 -->
         <div 
-          v-for="(message, index) in chatMessages" 
+          v-for="(message, index) in messages" 
           :key="index" 
-          :class="['message-item', message.isUser ? 'user-message' : 'ai-message']"
+          :class="['message-item', message.role === 'user' ? 'user-message' : 'ai-message']"
         >
-          <div v-if="!message.isUser" class="ai-avatar">
+          <div v-if="message.role !== 'user'" class="ai-avatar">
             <span class="emoji-avatar">🤖</span>
           </div>
           <div class="message-content">
-            <div v-if="message.thinking && !message.isUser" class="thinking-dots">
+            <div v-if="message.thinking && message.role !== 'user'" class="thinking-dots">
               <span></span><span></span><span></span>
             </div>
-            <div v-else v-html="formatMessage(message.content)"></div>
-            
-            <!-- 推荐商品卡片列表 -->
-            <div v-if="message.products && message.products.length > 0" class="product-recommendations">
-              <div 
-                v-for="product in message.products" 
-                :key="product.id" 
-                class="product-card"
-              >
-                <div class="product-image">
-                  <img :src="product.image" :alt="product.name">
-                </div>
-                <div class="product-details">
-                  <h4>{{ product.name }}</h4>
-                  <p class="product-description">{{ product.description }}</p>
-                  <div class="product-meta" v-if="product.rating">
-                    <span class="product-rating">
-                      <i class="el-icon-star-on"></i> {{ product.rating }}/5
-                    </span>
-                    <span class="product-stock">
-                      库存: {{ product.stock }}
-                    </span>
-                  </div>
-                  <div class="product-price-container">
-                    <span class="product-price">¥{{ product.price.toFixed(2) }}</span>
-                    <el-button size="mini" type="primary">查看详情</el-button>
+            <div v-else-if="message.type === 'orders'">
+              <div class="orders-list">
+                <div v-for="(order, i) in message.orders" :key="i" class="product-card">
+                  <div class="product-details">
+                    <h4>{{ order.name }}</h4>
+                    <div class="product-meta">
+                      <span class="product-stock">数量: {{ order.count }}</span>
+                    </div>
+                    <div class="product-price-container">
+                      <span class="product-price">¥{{ order.price }}</span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-            
-            <!-- 订单详情 -->
-            <div v-if="message.orderDetails" class="order-details">
-              <h4 class="order-title">订单信息</h4>
-              <div class="order-info">
-                <div class="order-row">
-                  <span class="order-label">商品:</span>
-                  <span class="order-value">{{ message.orderDetails.productName }}</span>
-                </div>
-                <div class="order-row">
-                  <span class="order-label">单价:</span>
-                  <span class="order-value">¥{{ message.orderDetails.price.toFixed(2) }}</span>
-                </div>
-                <div class="order-row">
-                  <span class="order-label">数量:</span>
-                  <span class="order-value">{{ message.orderDetails.quantity }}</span>
-                </div>
-                <div class="order-row">
-                  <span class="order-label">配送:</span>
-                  <span class="order-value">{{ message.orderDetails.shipping }}</span>
-                </div>
-                <div class="order-row">
-                  <span class="order-label">地址:</span>
-                  <span class="order-value">{{ message.orderDetails.address }}</span>
-                </div>
-                <div class="order-row">
-                  <span class="order-label">支付方式:</span>
-                  <span class="order-value">{{ message.orderDetails.payment }}</span>
-                </div>
-                <div class="order-row total-row">
-                  <span class="order-label">总计:</span>
-                  <span class="order-value order-total">¥{{ message.orderDetails.total.toFixed(2) }}</span>
-                </div>
-                <div class="order-row">
-                  <span class="order-label">预计送达:</span>
-                  <span class="order-value">{{ message.orderDetails.estimatedDelivery }}</span>
-                </div>
-              </div>
-            </div>
-            
-            <!-- 操作按钮 -->
-            <div v-if="message.actions && message.actions.length > 0" class="action-buttons">
-              <el-button 
-                v-for="action in message.actions" 
-                :key="action.type"
-                size="small"
-                type="primary"
-                plain
-                @click="handleAction(action)"
-              >{{ action.label }}</el-button>
-            </div>
+            <div v-else v-html="formatMessage(message.text)"></div>
           </div>
-          <div v-if="message.isUser" class="user-avatar">
+          <div v-if="message.role === 'user'" class="user-avatar">
             <span class="emoji-avatar">👤</span>
           </div>
         </div>
@@ -131,144 +66,126 @@
       
       <div class="chat-input">
         <el-input
-          v-model="userInput"
+          v-model="input"
           placeholder="请描述您想找的商品或询问导购助手..."
-          @keyup.enter="sendMessage"
+          @keyup.enter="sendMsg"
           :disabled="isProcessing"
           clearable
         >
           <template #append>
             <el-button 
               :icon="isProcessing ? 'el-icon-loading' : 'el-icon-s-promotion'" 
-              @click="sendMessage" 
-              :disabled="!userInput.trim() || isProcessing"
+              @click="sendMsg" 
+              :disabled="!input.trim() || isProcessing"
             >发送</el-button>
           </template>
         </el-input>
+      </div>
+    </div>
+    
+    <!-- 侧边快捷功能 -->
+    <div class="side-panel">
+      <div class="side-card" @click="quickSend('帮我查一下我下了什么订单', true)">
+        <div class="side-icon">🛒</div>
+        <div class="side-title">订单查询</div>
+        <div class="side-desc">一键查询我的所有订单</div>
+      </div>
+      <div class="side-card" @click="quickSend('帮我查一下我要付多少钱')">
+        <div class="side-icon">💰</div>
+        <div class="side-title">支付查询</div>
+        <div class="side-desc">快速查看应付金额</div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { ref, nextTick, watch, onMounted } from 'vue'
 
 const chatBody = ref(null)
-const userInput = ref('')
+const messages = ref([
+  { role: 'bot', text: '您好，有什么可以帮您？' }
+])
+const input = ref('')
 const isProcessing = ref(false)
-const chatMessages = ref([])
 
-// 发送快捷消息
-const sendQuickMessage = (message) => {
-  sendMessage(message);
+function sendMsg() {
+  const text = input.value.trim()
+  if (!text || isProcessing.value) return
+  
+  handleUserInput(text)
+  input.value = ''
+  scrollToBottom()
 }
 
-// 发送消息
-const sendMessage = async () => {
-  if (!userInput.value.trim() || isProcessing.value) return
+function quickSend(text, isOrder) {
+  if (isProcessing.value) return
   
-  // 添加用户消息
-  const userMessage = userInput.value
-  chatMessages.value.push({
-    content: userMessage,
-    isUser: true,
-    timestamp: new Date().toISOString()
-  })
+  handleUserInput(text, isOrder)
+  scrollToBottom()
+}
+
+function handleUserInput(text, isOrder) {
+  messages.value.push({ role: 'user', text })
   
-  // 清空输入框
-  userInput.value = ''
-  
-  // 添加AI思考状态
+  // 添加思考状态
   isProcessing.value = true
-  chatMessages.value.push({
-    content: '',
-    isUser: false,
-    thinking: true,
-    timestamp: new Date().toISOString()
-  })
   
-  // 滚动到底部
-  await scrollToBottom()
-  
-  // 模拟调用大模型API
-  await processUserMessage(userMessage)
+  if (text.includes('订单')) {
+    fetchOrders()
+  } else if (text.includes('付钱') || text.includes('付多少')) {
+    fetchTotal()
+  } else {
+    setTimeout(() => {
+      messages.value.push({ 
+        role: 'bot', 
+        text: '我们需要集成实际的API来处理您的请求。目前系统正在准备中，暂时无法处理具体业务。请稍后再试，或联系客服获取更多帮助。' 
+      })
+      isProcessing.value = false
+      scrollToBottom()
+    }, 600)
+  }
 }
 
-// 处理用户消息，调用大模型API
-const processUserMessage = async (message) => {
-  try {
-    // 模拟API响应延迟
-    await new Promise(resolve => setTimeout(resolve, 1000))
+function fetchOrders() {
+  // 模拟获取订单数据
+  setTimeout(() => {
+    const mockOrders = [
+      { name: '高性能笔记本电脑', count: 1, price: 6999 },
+      { name: '无线蓝牙耳机', count: 2, price: 499 },
+      { name: '智能手表', count: 1, price: 1299 }
+    ]
     
-    // 移除思考状态的消息
-    const thinkingIndex = chatMessages.value.findIndex(msg => msg.thinking)
-    if (thinkingIndex !== -1) {
-      chatMessages.value.splice(thinkingIndex, 1)
-    }
-    
-    // TODO: 实际项目中，需要集成以下API:
-    // 1. 大模型对话API - 处理用户消息并返回回复
-    // 2. 商品推荐API - 根据对话内容获取商品推荐
-    // 3. 订单API - 创建、查询和管理订单
-    // 4. 支付API - 处理支付流程
-    // 5. 物流API - 获取物流信息
-    
-    // 示例API调用结构
-    // const response = await fetch('/api/assistant/chat', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ 
-    //     message,
-    //     sessionId: sessionId.value,
-    //     userId: currentUser.id
-    //   })
-    // })
-    // const data = await response.json()
-    // 
-    // if (data.success) {
-    //   // 添加AI回复消息
-    //   chatMessages.value.push({
-    //     content: data.content,
-    //     isUser: false,
-    //     products: data.recommendedProducts || [],
-    //     actions: data.actions || [],
-    //     orderDetails: data.orderDetails || null,
-    //     timestamp: new Date().toISOString()
-    //   })
-    // }
-    
-    // 临时响应 - 在实际项目中应替换为API响应
-    chatMessages.value.push({
-      content: '我们需要集成实际的API来处理您的请求。目前系统正在准备中，暂时无法处理具体业务。请稍后再试，或联系客服获取更多帮助。',
-      isUser: false,
-      timestamp: new Date().toISOString()
+    messages.value.push({
+      role: 'bot',
+      type: 'orders',
+      orders: mockOrders
     })
     
-    // 滚动到底部
-    await scrollToBottom()
-  } catch (error) {
-    console.error('处理消息失败:', error)
-    
-    // 移除思考状态的消息
-    const thinkingIndex = chatMessages.value.findIndex(msg => msg.thinking)
-    if (thinkingIndex !== -1) {
-      chatMessages.value.splice(thinkingIndex, 1)
-    }
-    
-    // 添加错误消息
-    chatMessages.value.push({
-      content: '抱歉，我在处理您的请求时遇到了问题。请稍后再试。',
-      isUser: false,
-      timestamp: new Date().toISOString()
-    })
-  } finally {
     isProcessing.value = false
-  }
+    scrollToBottom()
+  }, 800)
+}
+
+function fetchTotal() {
+  // 模拟获取订单总额
+  setTimeout(() => {
+    const total = 6999 + (499 * 2) + 1299
+    messages.value.push({ 
+      role: 'bot', 
+      text: `您所有订单应付总金额为：¥${total}` 
+    })
+    
+    isProcessing.value = false
+    scrollToBottom()
+  }, 800)
 }
 
 // 清除聊天记录
 const clearChat = () => {
-  chatMessages.value = []
+  messages.value = [
+    { role: 'bot', text: '您好，有什么可以帮您？' }
+  ]
 }
 
 // 格式化消息，处理换行和链接
@@ -288,7 +205,7 @@ const scrollToBottom = async () => {
 }
 
 // 监听消息变化，自动滚动到底部
-watch(chatMessages, () => {
+watch(messages, () => {
   scrollToBottom()
 }, { deep: true })
 
@@ -296,50 +213,6 @@ watch(chatMessages, () => {
 onMounted(() => {
   scrollToBottom()
 })
-
-// 处理操作按钮点击
-const handleAction = async (action) => {
-  console.log('Action clicked:', action);
-  
-  // TODO: 实际项目中应该根据action类型调用对应的API
-  // 例如：
-  // if (action.type === 'purchase') {
-  //   try {
-  //     const response = await fetch('/api/orders/create', {
-  //       method: 'POST',
-  //       headers: { 'Content-Type': 'application/json' },
-  //       body: JSON.stringify({ productId: action.productId, quantity: 1 })
-  //     });
-  //     const result = await response.json();
-  //     if (result.success) {
-  //       // 处理成功响应
-  //     } else {
-  //       // 处理错误
-  //     }
-  //   } catch (error) {
-  //     console.error('API调用失败:', error);
-  //   }
-  // }
-  
-  // 临时实现：生成对应的用户消息
-  const actionMessages = {
-    'compare': '我想比较这些商品',
-    'filter': '我想筛选商品',
-    'purchase': '我想购买这个商品',
-    'confirm_order': '确认下单',
-    'modify_address': '修改地址',
-    'change_payment': '更改支付方式',
-    'pay_now': '支付订单',
-    'cancel_order': '取消订单',
-    'track_order': '追踪订单',
-    'continue_shopping': '继续购物',
-    'view_details': '查看详情',
-    'contact_support': '联系客服'
-  };
-  
-  const message = actionMessages[action.type] || '我想了解更多';
-  sendMessage(message);
-};
 </script>
 
 <style scoped>
@@ -719,13 +592,6 @@ const handleAction = async (action) => {
   }
 }
 
-.product-recommendations {
-  margin-top: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
-
 .product-card {
   display: flex;
   background: rgba(30, 38, 60, 0.7);
@@ -735,6 +601,8 @@ const handleAction = async (action) => {
   transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
   border: 1px solid rgba(100, 255, 218, 0.1);
   position: relative;
+  margin-bottom: 10px;
+  padding: 15px;
 }
 
 .product-card::before {
@@ -751,41 +619,13 @@ const handleAction = async (action) => {
 }
 
 .product-card:hover {
-  transform: translateY(-5px) scale(1.01);
+  transform: translateY(-2px);
   box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
   border-color: rgba(100, 255, 218, 0.3);
 }
 
-.product-image {
-  width: 120px;
-  height: 120px;
-  flex-shrink: 0;
-  position: relative;
-  overflow: hidden;
-}
-
-.product-image::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, rgba(30, 38, 60, 0.3) 0%, transparent 100%);
-  z-index: 1;
-}
-
-.product-image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
 .product-details {
   flex: 1;
-  padding: 15px;
-  display: flex;
-  flex-direction: column;
   position: relative;
   z-index: 1;
 }
@@ -797,33 +637,13 @@ const handleAction = async (action) => {
   letter-spacing: 0.3px;
 }
 
-.product-description {
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 13px;
-  margin: 0 0 12px;
-  flex: 1;
-  line-height: 1.5;
-}
-
 .product-meta {
   margin-bottom: 12px;
-}
-
-.product-rating {
-  color: #64ffda;
-  font-size: 14px;
-  margin-right: 10px;
 }
 
 .product-stock {
   color: rgba(255, 255, 255, 0.7);
   font-size: 14px;
-}
-
-.product-price-container {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
 }
 
 .product-price {
@@ -833,91 +653,88 @@ const handleAction = async (action) => {
   text-shadow: 0 0 10px rgba(100, 255, 218, 0.3);
 }
 
-.product-price-container .el-button {
-  background: linear-gradient(135deg, #33a3ff 0%, #0063e5 100%);
-  border: none;
-  transition: all 0.3s ease;
-}
-
-.product-price-container .el-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.4);
-}
-
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .product-card {
-    flex-direction: column;
-  }
-  
-  .product-image {
-    width: 100%;
-    height: 180px;
-  }
-  
-  .message-item {
-    max-width: 95%;
-  }
-}
-
-.order-details {
-  margin-top: 20px;
-  padding: 15px;
-  background: rgba(30, 38, 60, 0.7);
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
-  border: 1px solid rgba(100, 255, 218, 0.1);
-}
-
-.order-title {
-  margin: 0 0 12px;
-  font-size: 18px;
-  color: #64ffda;
-  letter-spacing: 0.3px;
-}
-
-.order-info {
+.orders-list {
+  margin-top: 10px;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-.order-row {
+/* 侧边面板 */
+.side-panel {
+  position: absolute;
+  right: 20px;
+  top: 100px;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 20px;
+  z-index: 10;
+}
+
+.side-card {
+  background: linear-gradient(135deg, rgba(30, 38, 60, 0.8) 0%, rgba(16, 20, 37, 0.8) 100%);
+  border-radius: 12px;
+  padding: 15px;
+  width: 160px;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-}
-
-.order-label {
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 14px;
-}
-
-.order-value {
-  color: rgba(255, 255, 255, 0.95);
-  font-size: 14px;
-}
-
-.order-total {
-  font-weight: bold;
-}
-
-.action-buttons {
-  margin-top: 20px;
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
-.action-buttons .el-button {
-  background: linear-gradient(135deg, #33a3ff 0%, #0063e5 100%);
-  border: none;
-  color: white;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(100, 255, 218, 0.1);
   transition: all 0.3s ease;
 }
 
-.action-buttons .el-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.4);
+.side-card:hover {
+  transform: translateY(-5px);
+  background: linear-gradient(135deg, rgba(51, 163, 255, 0.2) 0%, rgba(100, 255, 218, 0.2) 100%);
+  border-color: rgba(100, 255, 218, 0.3);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+}
+
+.side-icon {
+  font-size: 32px;
+  margin-bottom: 10px;
+  filter: drop-shadow(0 0 10px rgba(100, 255, 218, 0.5));
+}
+
+.side-title {
+  color: #64ffda;
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 6px;
+  letter-spacing: 0.5px;
+}
+
+.side-desc {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  text-align: center;
+  line-height: 1.4;
+}
+
+/* 响应式设计 */
+@media (max-width: 1200px) {
+  .side-panel {
+    position: relative;
+    right: auto;
+    top: auto;
+    flex-direction: row;
+    justify-content: center;
+    gap: 20px;
+    margin-top: 20px;
+    margin-bottom: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .message-item {
+    max-width: 95%;
+  }
+  
+  .side-panel {
+    flex-direction: column;
+    align-items: center;
+  }
 }
 </style> 
