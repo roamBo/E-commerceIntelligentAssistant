@@ -3,36 +3,29 @@ import { ref } from 'vue'
 import Sidebar from './components/Sidebar.vue'
 import OrderManager from './components/OrderManager.vue'
 import ShoppingGuide from './components/ShoppingGuide.vue'
-import PaymentSystem from './components/PaymentSystem.vue'
 
-const currentPage = ref('dashboard')
+const currentPage = ref('order')
 </script>
 
 <template>
-  <el-container style="height: 100vh;">
-    <el-aside width="200px">
-      <Sidebar @change="currentPage = $event" />
-    </el-aside>
-    <el-main>
-      <Dashboard v-if="currentPage === 'dashboard'" />
+  <div class="app-container">
+    <Sidebar @change="currentPage = $event" />
+    <main class="main-content">
       <OrderManager v-if="currentPage === 'order'" />
       <ShoppingGuide v-if="currentPage === 'guide'" />
-      <PaymentSystem v-if="currentPage === 'payment'" />
-    </el-main>
-  </el-container>
+    </main>
+  </div>
 </template>
 
 <style scoped>
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
+.app-container {
+  min-height: 100vh;
+  padding-top: 64px;
+  background: #f8fafc;
 }
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.vue:hover {
-  filter: drop-shadow(0 0 2em #42b883aa);
+.main-content {
+  padding: 24px;
+  margin: 0 auto;
+  max-width: 1200px;
 }
 </style>
