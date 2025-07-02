@@ -5,10 +5,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 public class testController {
-    @GetMapping("/offer")
-    public String offerService(){
-        System.out.println("offer service invoke");
-        return "offer service invoke";
+    @GetMapping("/test")
+    public String test(){
+        System.out.println("test invoke");
+        return "test invoke";
     }
 }
-
