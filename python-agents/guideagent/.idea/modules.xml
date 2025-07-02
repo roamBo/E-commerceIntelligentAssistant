@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/python-agents.iml" filepath="$PROJECT_DIR$/.idea/python-agents.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/guideagent.iml" filepath="$PROJECT_DIR$/.idea/guideagent.iml" />
     </modules>
   </component>
 </project>
