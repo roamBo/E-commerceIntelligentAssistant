@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/frontend-console/frontend-console.iml" filepath="$PROJECT_DIR$/frontend-console/frontend-console.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/E-commerceIntelligentAssistant.iml" filepath="$PROJECT_DIR$/.idea/E-commerceIntelligentAssistant.iml" />
     </modules>
   </component>
 </project>
