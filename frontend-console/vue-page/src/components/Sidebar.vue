@@ -1,8 +1,8 @@
 <template>
   <header class="top-navbar">
-    <div class="logo-title">
-      <img src="" alt="logo" class="logo-img" />
+    <div class="logo-title" @click="$emit('change', 'home')" role="button">
       <span class="logo-text">智能助手</span>
+      <div class="tech-line"></div>
     </div>
     <nav class="nav-menu">
       <div
@@ -11,11 +11,17 @@
         class="nav-item"
         @mouseenter="hoverIndex = item.index"
         @mouseleave="hoverIndex = null"
+        @click="handleMenuClick(item)"
       >
         <span class="nav-label">{{ item.label }}</span>
         <transition name="dropdown-fade">
           <div v-if="hoverIndex === item.index && item.children" class="dropdown-list">
-            <div v-for="child in item.children" :key="child.label" class="dropdown-item">
+            <div 
+              v-for="child in item.children" 
+              :key="child.label" 
+              class="dropdown-item"
+              @click.stop="handleSubmenuClick(item.index, child.label)"
+            >
               <i :class="child.icon"></i>
               <span>{{ child.label }}</span>
             </div>
@@ -28,34 +34,49 @@
 
 <script setup>
 import { ref } from 'vue'
+
 const hoverIndex = ref(null)
 const menuItems = [
   {
     index: 'order',
     label: '订单智能管家',
     children: [
-      { label: '订单查询', icon: 'el-icon-search' },
-      { label: '订单修改', icon: 'el-icon-edit' },
-      { label: '异常预警', icon: 'el-icon-warning' }
+      { label: '订单查询', icon: 'el-icon-search' }
     ]
   },
   {
     index: 'guide',
-    label: '个性化导购助手',
-    children: [
-      { label: '商品推荐', icon: 'el-icon-goods' },
-      { label: '用户分析', icon: 'el-icon-user' }
-    ]
+    label: '个性化导购助手'
+  },
+  {
+    index: 'payment',
+    label: '智能支付系统'
   }
 ]
+
+const emit = defineEmits(['change'])
+
+const handleMenuClick = (item) => {
+  // 订单智能管家不响应点击，其他菜单项正常响应
+  if (item.index !== 'order') {
+    emit('change', item.index)
+  }
+}
+
+const handleSubmenuClick = (parentIndex, childLabel) => {
+  if (parentIndex === 'order' && childLabel === '订单查询') {
+    emit('change', 'order')
+  }
+}
 </script>
 
 <style scoped>
 .top-navbar {
-  width: 100vw;
+  width: 100%;
   height: 64px;
-  background: #fff;
-  box-shadow: 0 2px 8px rgba(79,140,255,0.08);
+  background: rgba(10, 25, 47, 0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(100, 255, 218, 0.1);
   display: flex;
   align-items: center;
   padding: 0 40px;
@@ -64,83 +85,134 @@ const menuItems = [
   left: 0;
   z-index: 2000;
 }
+
 .logo-title {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   margin-right: 48px;
+  position: relative;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
 }
-.logo-img {
-  width: 38px;
-  height: 38px;
-  margin-right: 10px;
+
+.logo-title:hover {
+  background: rgba(100, 255, 218, 0.1);
 }
+
+.logo-title:hover .logo-text {
+  text-shadow: 0 0 20px rgba(100, 255, 218, 0.5);
+}
+
 .logo-text {
   font-size: 1.5em;
   font-weight: bold;
-  color: #3358c5;
+  color: #64ffda;
+  text-shadow: 0 0 10px rgba(100, 255, 218, 0.3);
   letter-spacing: 2px;
 }
+
+.tech-line {
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #64ffda, transparent);
+  margin-top: 2px;
+  animation: scanLine 2s linear infinite;
+}
+
+@keyframes scanLine {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
 .nav-menu {
   display: flex;
   align-items: center;
   height: 100%;
 }
+
 .nav-item {
   position: relative;
   margin: 0 24px;
   font-size: 1.1em;
-  color: #222;
+  color: rgba(255, 255, 255, 0.7);
   cursor: pointer;
   height: 64px;
   display: flex;
   align-items: center;
-  transition: color 0.2s;
+  transition: color 0.3s;
 }
+
 .nav-item:hover .nav-label {
-  color: #4f8cff;
+  color: #64ffda;
 }
+
 .nav-label {
   padding: 0 8px;
   font-weight: 500;
+  position: relative;
 }
+
+.nav-label::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: #64ffda;
+  transform: scaleX(0);
+  transition: transform 0.3s ease;
+}
+
+.nav-item:hover .nav-label::after {
+  transform: scaleX(1);
+}
+
 .dropdown-list {
   position: absolute;
   top: 64px;
   left: 0;
-  background: #fff;
-  box-shadow: 0 8px 32px 0 rgba(79,140,255,0.12);
+  background: rgba(10, 25, 47, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(100, 255, 218, 0.1);
+  box-shadow: 0 8px 32px rgba(100, 255, 218, 0.2);
   border-radius: 12px;
   min-width: 180px;
   padding: 16px 0;
   display: flex;
   flex-direction: column;
-  animation: dropdownIn 0.25s;
 }
-@keyframes dropdownIn {
-  0% { opacity: 0; transform: translateY(10px) scale(0.98); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
-}
+
 .dropdown-item {
   display: flex;
   align-items: center;
   padding: 8px 24px;
-  color: #3358c5;
+  color: rgba(255, 255, 255, 0.7);
   font-size: 1em;
-  transition: background 0.2s, color 0.2s;
+  transition: all 0.3s;
   cursor: pointer;
 }
+
 .dropdown-item:hover {
-  background: #f4f8ff;
-  color: #4f8cff;
+  background: rgba(100, 255, 218, 0.1);
+  color: #64ffda;
 }
+
 .dropdown-item i {
   margin-right: 10px;
   font-size: 1.2em;
 }
-.dropdown-fade-enter-active, .dropdown-fade-leave-active {
-  transition: opacity 0.2s;
+
+.dropdown-fade-enter-active,
+.dropdown-fade-leave-active {
+  transition: all 0.3s ease;
 }
-.dropdown-fade-enter-from, .dropdown-fade-leave-to {
+
+.dropdown-fade-enter-from,
+.dropdown-fade-leave-to {
   opacity: 0;
+  transform: translateY(10px);
 }
 </style> 
