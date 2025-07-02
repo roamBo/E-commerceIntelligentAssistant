@@ -162,7 +162,7 @@ const goBack = () => {
 <style scoped>
 .payment-system {
   height: 100%;
-  background: linear-gradient(135deg, #1a2035 0%, #101425 100%);
+  background: #f5f7fa;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -173,11 +173,10 @@ const goBack = () => {
 .payment-container {
   width: 100%;
   max-width: 700px;
-  background: rgba(30, 40, 60, 0.8);
-  backdrop-filter: blur(10px);
-  border-radius: 16px;
-  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  border: 1px solid #ebeef5;
   padding: 25px;
   display: flex;
   flex-direction: column;
@@ -188,12 +187,12 @@ const goBack = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid #ebeef5;
   padding-bottom: 15px;
 }
 
 .payment-header h2 {
-  color: #fff;
+  color: #303133;
   font-size: 22px;
   margin: 0;
   font-weight: 600;
@@ -229,12 +228,12 @@ const goBack = () => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: rgba(35, 45, 65, 0.5);
-  border-radius: 12px;
+  background: #f9f9f9;
+  border-radius: 8px;
   padding: 25px;
   gap: 15px;
   text-align: center;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid #ebeef5;
 }
 
 .result-icon {
@@ -271,7 +270,7 @@ const goBack = () => {
 }
 
 .result-message {
-  color: #fff;
+  color: #303133;
   font-size: 16px;
   line-height: 1.5;
 }
@@ -283,18 +282,18 @@ const goBack = () => {
 }
 
 .order-info, .payment-info, .product-info {
-  background: rgba(35, 45, 65, 0.5);
-  border-radius: 12px;
+  background: #f9f9f9;
+  border-radius: 8px;
   padding: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid #ebeef5;
 }
 
 .order-info h3, .payment-info h3, .product-info h3 {
-  color: rgba(255, 255, 255, 0.9);
+  color: #303133;
   font-size: 16px;
   margin: 0 0 15px 0;
   font-weight: 500;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid #ebeef5;
   padding-bottom: 10px;
 }
 
@@ -305,12 +304,12 @@ const goBack = () => {
 }
 
 .info-label {
-  color: rgba(255, 255, 255, 0.6);
+  color: #606266;
   font-size: 14px;
 }
 
 .info-value {
-  color: #fff;
+  color: #303133;
   font-size: 14px;
   font-weight: 500;
   display: flex;
@@ -337,12 +336,12 @@ const goBack = () => {
 
 .product-name {
   flex: 1;
-  color: #fff;
+  color: #303133;
   font-size: 14px;
 }
 
 .product-quantity {
-  color: rgba(255, 255, 255, 0.6);
+  color: #909399;
   font-size: 14px;
   margin: 0 15px;
 }
@@ -359,11 +358,11 @@ const goBack = () => {
   align-items: center;
   margin-top: 10px;
   padding-top: 15px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid #ebeef5;
 }
 
 .total-amount {
-  color: rgba(255, 255, 255, 0.8);
+  color: #606266;
   font-size: 15px;
 }
 
@@ -395,14 +394,14 @@ const goBack = () => {
 }
 
 .action-button.primary {
-  background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+  background: #409eff;
   color: white;
   border: none;
 }
 
 .action-button.primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
+  box-shadow: 0 5px 15px rgba(64, 158, 255, 0.3);
 }
 
 /* 响应式设计 */

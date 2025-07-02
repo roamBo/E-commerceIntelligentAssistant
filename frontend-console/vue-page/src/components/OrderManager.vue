@@ -202,23 +202,23 @@ const getTotalAmount = (order) => {
 .order-manager {
   width: 100%;
   height: 100%;
-  padding: 20px;
-  background: linear-gradient(135deg, #1a2035 0%, #101425 100%);
+  padding: 24px;
+  background: #f5f7fa;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 .order-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .order-header h2 {
   font-size: 24px;
-  color: #64ffda;
+  color: #303133;
   margin: 0;
 }
 
@@ -371,18 +371,19 @@ const getTotalAmount = (order) => {
 .data-table {
   flex: 1;
   overflow: auto; /* 确保表格内容可滚动 */
-  border-radius: 10px;
-  background: rgba(30, 38, 60, 0.5);
-  padding: 15px;
-  border: 1px solid rgba(100, 255, 218, 0.1);
 }
 
 /* 添加响应式设计 */
 @media (max-width: 768px) {
+  .order-manager {
+    padding: 16px;
+  }
+  
   .order-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 10px;
+    margin-bottom: 16px;
   }
   
   .filter-controls {
