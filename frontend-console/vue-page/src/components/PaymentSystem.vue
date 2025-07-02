@@ -406,9 +406,43 @@ const goBack = () => {
 }
 
 /* 响应式设计 */
-@media (max-width: 768px) {
+@media (max-width: 992px) {
+  .payment-container {
+    width: 95%;
+    padding: 20px;
+  }
+  
   .payment-details {
     grid-template-columns: 1fr;
+    gap: 15px;
+  }
+}
+
+@media (max-width: 768px) {
+  .payment-system {
+    padding: 15px;
+    align-items: flex-start;
+  }
+  
+  .payment-container {
+    width: 100%;
+    border-radius: 10px;
+    padding: 15px;
+    gap: 15px;
+  }
+  
+  .payment-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  
+  .payment-status {
+    align-self: flex-start;
+  }
+  
+  .order-info, .payment-info, .product-info {
+    padding: 15px;
   }
   
   .action-bar {
@@ -424,6 +458,58 @@ const goBack = () => {
   .buttons {
     width: 100%;
     justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .payment-system {
+    padding: 10px;
+  }
+  
+  .payment-container {
+    padding: 12px;
+    gap: 12px;
+  }
+  
+  .payment-header h2 {
+    font-size: 18px;
+  }
+  
+  .payment-status {
+    font-size: 12px;
+    padding: 4px 8px;
+  }
+  
+  .payment-result-card {
+    padding: 15px;
+  }
+  
+  .result-icon {
+    width: 50px;
+    height: 50px;
+    font-size: 24px;
+  }
+  
+  .result-message {
+    font-size: 14px;
+  }
+  
+  .order-info h3, .payment-info h3, .product-info h3 {
+    font-size: 15px;
+    margin-bottom: 10px;
+  }
+  
+  .info-item {
+    margin-bottom: 8px;
+  }
+  
+  .info-label, .info-value {
+    font-size: 13px;
+  }
+  
+  .action-button {
+    padding: 6px 12px;
+    font-size: 13px;
   }
 }
 </style> 

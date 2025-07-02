@@ -215,4 +215,81 @@ const handleSubmenuClick = (parentIndex, childLabel) => {
   opacity: 0;
   transform: translateY(10px);
 }
+
+/* 添加响应式设计 */
+@media (max-width: 992px) {
+  .top-navbar {
+    padding: 0 20px;
+  }
+  
+  .logo-title {
+    margin-right: 20px;
+  }
+  
+  .nav-item {
+    margin: 0 15px;
+    font-size: 1em;
+  }
+}
+
+@media (max-width: 768px) {
+  .top-navbar {
+    height: 56px;
+    padding: 0 15px;
+  }
+  
+  .logo-title {
+    margin-right: 15px;
+  }
+  
+  .logo-text {
+    font-size: 1.3em;
+  }
+  
+  .nav-item {
+    margin: 0 10px;
+    font-size: 0.9em;
+  }
+  
+  .dropdown-list {
+    min-width: 160px;
+  }
+  
+  .dropdown-item {
+    padding: 6px 16px;
+    font-size: 0.9em;
+  }
+}
+
+@media (max-width: 480px) {
+  .top-navbar {
+    padding: 0 10px;
+  }
+  
+  .logo-title {
+    margin-right: 10px;
+  }
+  
+  .logo-text {
+    font-size: 1.1em;
+  }
+  
+  .nav-item {
+    margin: 0 5px;
+    font-size: 0.85em;
+  }
+  
+  .dropdown-list {
+    min-width: 140px;
+    left: -20px; /* 调整下拉菜单位置，避免超出屏幕 */
+  }
+  
+  .dropdown-item {
+    padding: 5px 12px;
+  }
+  
+  .dropdown-item i {
+    margin-right: 5px;
+  }
+}
 </style> 
