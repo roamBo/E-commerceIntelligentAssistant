@@ -459,6 +459,16 @@ function animateParticles() {
   border: none;
   color: white;
   transition: all 0.3s ease;
+  padding-right: 30px;
+  padding-left: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.chat-input .el-input-group__append button .el-icon-s-promotion,
+.chat-input .el-input-group__append button .el-icon-loading {
+  margin-right: 8px;
 }
 
 .chat-input .el-input-group__append button:hover:not(:disabled) {
@@ -881,6 +891,17 @@ function animateParticles() {
 
   .side-desc {
     font-size: 11px;
+  }
+  
+  /* 小屏幕上调整发送按钮的内边距 */
+  .chat-input .el-input-group__append button {
+    padding-right: 10px;
+    padding-left: 8px;
+  }
+  
+  .chat-input .el-input-group__append button .el-icon-s-promotion,
+  .chat-input .el-input-group__append button .el-icon-loading {
+    margin-right: 5px;
   }
 }
 
