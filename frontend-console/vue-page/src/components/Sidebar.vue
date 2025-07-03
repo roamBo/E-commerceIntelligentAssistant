@@ -1,19 +1,30 @@
 <template>
   <header class="top-navbar">
-    <div class="logo-title" @click="$emit('change', 'home')" role="button">
+    <div 
+      class="logo-title" 
+      :class="{ 'active': activeIndex === 'home' }"
+      @click="handleLogoClick" 
+      role="button"
+    >
       <span class="logo-text">智能电商助手</span>
-      <div class="tech-line"></div>
+      <div v-if="activeIndex === 'home'" class="active-indicator">
+        <div class="tech-line"></div>
+      </div>
     </div>
     <nav class="nav-menu">
       <div
         v-for="item in menuItems"
         :key="item.index"
         class="nav-item"
+        :class="{ 'active': activeIndex === item.index }"
         @mouseenter="hoverIndex = item.index"
         @mouseleave="hoverIndex = null"
         @click="handleMenuClick(item)"
       >
         <span class="nav-label">{{ item.label }}</span>
+        <div v-if="activeIndex === item.index" class="active-indicator">
+          <div class="tech-line"></div>
+        </div>
         <transition name="dropdown-fade">
           <div v-if="hoverIndex === item.index && item.children" class="dropdown-list">
             <div 
@@ -33,9 +44,11 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 
 const hoverIndex = ref(null)
+const activeIndex = ref(null)
+
 const menuItems = [
   {
     index: 'order',
@@ -54,8 +67,18 @@ const menuItems = [
 const emit = defineEmits(['change'])
 
 const handleMenuClick = (item) => {
+  activeIndex.value = item.index
   emit('change', item.index)
 }
+
+const handleLogoClick = () => {
+  activeIndex.value = 'home'
+  emit('change', 'home')
+}
+
+onMounted(() => {
+  activeIndex.value = 'home'
+})
 </script>
 
 <style scoped>
@@ -93,6 +116,10 @@ const handleMenuClick = (item) => {
   text-shadow: 0 0 20px rgba(100, 255, 218, 0.5);
 }
 
+.logo-title.active .logo-text {
+  text-shadow: 0 0 20px rgba(100, 255, 218, 0.5);
+}
+
 .logo-text {
   font-size: 1.5em;
   font-weight: bold;
@@ -102,16 +129,35 @@ const handleMenuClick = (item) => {
 }
 
 .tech-line {
-  width: 100%;
+  width: 80%;
   height: 2px;
-  background: linear-gradient(90deg, transparent, #64ffda, transparent);
-  margin-top: 2px;
-  animation: scanLine 2s linear infinite;
+  background: transparent;
+  margin: 2px auto 0;
+  position: relative;
+  overflow: hidden;
 }
 
-@keyframes scanLine {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+.tech-line::before {
+  content: '';
+  position: absolute;
+  width: 80px;
+  height: 100%;
+  background: linear-gradient(90deg, 
+    rgba(100, 255, 218, 0), 
+    rgba(100, 255, 218, 1), 
+    rgba(100, 255, 218, 0));
+  left: 0;
+  top: 0;
+  animation: movingLight 3s linear infinite;
+}
+
+@keyframes movingLight {
+  0% {
+    left: -80px;
+  }
+  100% {
+    left: 100%;
+  }
 }
 
 .nav-menu {
@@ -136,6 +182,11 @@ const handleMenuClick = (item) => {
   color: #64ffda;
 }
 
+.nav-item.active .nav-label {
+  color: #64ffda;
+  text-shadow: 0 0 10px rgba(100, 255, 218, 0.5);
+}
+
 .nav-label {
   padding: 0 8px;
   font-weight: 500;
@@ -156,6 +207,35 @@ const handleMenuClick = (item) => {
 
 .nav-item:hover .nav-label::after {
   transform: scaleX(1);
+}
+
+.active-indicator {
+  position: absolute;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  padding-bottom: 5px;
+}
+
+.nav-item .active-indicator {
+  width: auto;
+  left: 8px;
+  right: 8px;
+}
+
+.nav-item .active-indicator .tech-line {
+  width: 100%;
+}
+
+.logo-title .active-indicator {
+  bottom: -5px;
+  width: auto;
+  left: 0;
+  right: 0;
+}
+
+.logo-title .active-indicator .tech-line {
+  width: 100%;
 }
 
 .dropdown-list {
@@ -204,7 +284,6 @@ const handleMenuClick = (item) => {
   transform: translateY(10px);
 }
 
-/* 添加响应式设计 */
 @media (max-width: 992px) {
   .top-navbar {
     padding: 0 20px;
@@ -269,7 +348,7 @@ const handleMenuClick = (item) => {
   
   .dropdown-list {
     min-width: 140px;
-    left: -20px; /* 调整下拉菜单位置，避免超出屏幕 */
+    left: -20px;
   }
   
   .dropdown-item {
