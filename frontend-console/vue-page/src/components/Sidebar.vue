@@ -60,7 +60,7 @@ const menuItems = [
   },
   {
     index: 'payment',
-    label: '智能支付系统'
+    label: '智能支付系统(测试)'
   }
 ]
 
