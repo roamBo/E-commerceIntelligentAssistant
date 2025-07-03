@@ -80,11 +80,62 @@
         </div>
       </div>
     </div>
+    
+    <!-- 订单查询结果弹窗 -->
+    <div class="modal" v-if="showOrderModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>订单详情</h3>
+          <span class="close-btn" @click="closeModal">&times;</span>
+        </div>
+        <div class="modal-body">
+          <div v-if="orderDetails">
+            <div class="order-detail-item">
+              <span class="detail-label">订单号:</span>
+              <span class="detail-value">{{ orderDetails.orderId }}</span>
+            </div>
+            <div class="order-detail-item">
+              <span class="detail-label">下单时间:</span>
+              <span class="detail-value">{{ orderDetails.orderTime }}</span>
+            </div>
+            <div class="order-detail-item">
+              <span class="detail-label">订单状态:</span>
+              <span class="detail-value" :class="'status-' + orderDetails.status">{{ getOrderStatusText(orderDetails.status) }}</span>
+            </div>
+            <div class="order-detail-item">
+              <span class="detail-label">收货地址:</span>
+              <span class="detail-value">{{ orderDetails.address }}</span>
+            </div>
+            <div class="order-detail-item">
+              <span class="detail-label">联系电话:</span>
+              <span class="detail-value">{{ orderDetails.phone }}</span>
+            </div>
+            <div class="order-products">
+              <h4>商品列表</h4>
+              <div class="product-list">
+                <div class="product-list-item" v-for="(item, index) in orderDetails.products" :key="index">
+                  <span class="product-list-name">{{ item.name }}</span>
+                  <span class="product-list-quantity">x{{ item.quantity }}</span>
+                  <span class="product-list-price">¥{{ item.price.toFixed(2) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div v-else class="no-order-found">
+            <div class="no-data-icon">!</div>
+            <p>未找到订单信息，请确认订单号是否正确</p>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue';
+import { ref, reactive, defineEmits } from 'vue';
+
+// 定义事件
+const emit = defineEmits(['change']);
 
 // 支付状态类型
 const statusTypes = {
@@ -124,6 +175,47 @@ const paymentInfo = reactive({
   unitPrice: 2499.00
 });
 
+// 模拟订单数据库
+const orderDatabase = [
+  {
+    orderId: 'ORD98765432',
+    orderTime: '2023-06-15 14:30:22',
+    status: 'success',
+    address: '北京市海淀区中关村南大街5号',
+    phone: '138****1234',
+    products: [
+      {
+        name: '智能音箱 Pro',
+        quantity: 1,
+        price: 2499.00
+      }
+    ]
+  },
+  {
+    orderId: 'ORD87654321',
+    orderTime: '2023-06-10 09:15:33',
+    status: 'shipped',
+    address: '上海市浦东新区张江高科技园区',
+    phone: '139****5678',
+    products: [
+      {
+        name: '智能手表',
+        quantity: 1,
+        price: 1299.00
+      },
+      {
+        name: '蓝牙耳机',
+        quantity: 2,
+        price: 499.00
+      }
+    ]
+  }
+];
+
+// 订单详情弹窗状态
+const showOrderModal = ref(false);
+const orderDetails = ref(null);
+
 // 获取支付方式图标
 const getPaymentIcon = (method) => {
   const icons = {
@@ -146,16 +238,38 @@ const getPaymentName = (method) => {
   return names[method] || method;
 };
 
+// 获取订单状态文本
+const getOrderStatusText = (status) => {
+  const statusMap = {
+    'pending': '待支付',
+    'paid': '已支付',
+    'processing': '处理中',
+    'shipped': '已发货',
+    'delivered': '已送达',
+    'success': '交易成功',
+    'cancelled': '已取消',
+    'refunded': '已退款'
+  };
+  return statusMap[status] || status;
+};
+
 // 查看订单详情
 const viewOrderDetails = () => {
-  console.log('查看订单详情', paymentInfo.orderId);
-  // 实际项目中可以跳转到订单详情页
+  // 模拟API查询订单
+  const order = orderDatabase.find(o => o.orderId === paymentInfo.orderId);
+  orderDetails.value = order || null;
+  showOrderModal.value = true;
+};
+
+// 关闭弹窗
+const closeModal = () => {
+  showOrderModal.value = false;
 };
 
 // 返回首页
 const goBack = () => {
-  console.log('返回首页');
-  // 实际项目中可以跳转到首页
+  // 发射事件通知父组件切换到首页
+  emit('change', 'home');
 };
 </script>
 
@@ -165,22 +279,23 @@ const goBack = () => {
   background: #f5f7fa;
   display: flex;
   justify-content: center;
-  align-items: center;
-  padding: 20px;
+  align-items: flex-start;
+  padding: 15px;
   box-sizing: border-box;
+  overflow-y: auto;
 }
 
 .payment-container {
   width: 100%;
-  max-width: 700px;
+  max-width: 600px;
   background: #ffffff;
   border-radius: 8px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px 0 rgba(0, 0, 0, 0.1);
   border: 1px solid #ebeef5;
-  padding: 25px;
+  padding: 15px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 15px;
 }
 
 .payment-header {
@@ -188,20 +303,20 @@ const goBack = () => {
   justify-content: space-between;
   align-items: center;
   border-bottom: 1px solid #ebeef5;
-  padding-bottom: 15px;
+  padding-bottom: 10px;
 }
 
 .payment-header h2 {
   color: #303133;
-  font-size: 22px;
+  font-size: 18px;
   margin: 0;
   font-weight: 600;
 }
 
 .payment-status {
-  padding: 5px 12px;
-  border-radius: 20px;
-  font-size: 14px;
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 12px;
   font-weight: 500;
 }
 
@@ -230,20 +345,20 @@ const goBack = () => {
   justify-content: center;
   background: #f9f9f9;
   border-radius: 8px;
-  padding: 25px;
-  gap: 15px;
+  padding: 15px;
+  gap: 10px;
   text-align: center;
   border: 1px solid #ebeef5;
 }
 
 .result-icon {
-  width: 60px;
-  height: 60px;
+  width: 45px;
+  height: 45px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 28px;
+  font-size: 22px;
 }
 
 .result-icon.success {
@@ -271,50 +386,51 @@ const goBack = () => {
 
 .result-message {
   color: #303133;
-  font-size: 16px;
-  line-height: 1.5;
+  font-size: 14px;
+  line-height: 1.4;
 }
 
 .payment-details {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 20px;
+  gap: 12px;
 }
 
 .order-info, .payment-info, .product-info {
   background: #f9f9f9;
   border-radius: 8px;
-  padding: 20px;
+  padding: 12px;
   border: 1px solid #ebeef5;
 }
 
 .order-info h3, .payment-info h3, .product-info h3 {
   color: #303133;
-  font-size: 16px;
-  margin: 0 0 15px 0;
+  font-size: 14px;
+  margin: 0 0 10px 0;
   font-weight: 500;
   border-bottom: 1px solid #ebeef5;
-  padding-bottom: 10px;
+  padding-bottom: 8px;
 }
 
 .info-item {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .info-label {
   color: #606266;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .info-value {
   color: #303133;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
+  word-break: break-all;
 }
 
 .price {
@@ -331,24 +447,24 @@ const goBack = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 0;
+  padding: 6px 0;
 }
 
 .product-name {
   flex: 1;
   color: #303133;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .product-quantity {
   color: #909399;
-  font-size: 14px;
-  margin: 0 15px;
+  font-size: 13px;
+  margin: 0 10px;
 }
 
 .product-price {
   color: #ff7675;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -356,41 +472,41 @@ const goBack = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 10px;
-  padding-top: 15px;
+  margin-top: 8px;
+  padding-top: 10px;
   border-top: 1px solid #ebeef5;
 }
 
 .total-amount {
   color: #606266;
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .total-amount .amount {
   color: #ff7675;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
-  margin-left: 5px;
+  margin-left: 4px;
 }
 
 .buttons {
   display: flex;
-  gap: 10px;
+  gap: 8px;
 }
 
 .action-button {
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-size: 14px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 13px;
   cursor: pointer;
   transition: all 0.3s ease;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: transparent;
-  color: rgba(255, 255, 255, 0.8);
+  border: 1px solid #dcdfe6;
+  background: #ffffff;
+  color: #606266;
 }
 
 .action-button:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: #f2f6fc;
 }
 
 .action-button.primary {
@@ -400,53 +516,175 @@ const goBack = () => {
 }
 
 .action-button.primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(64, 158, 255, 0.3);
+  background: #66b1ff;
+}
+
+/* 订单详情弹窗样式 */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background-color: #fff;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #303133;
+}
+
+.close-btn {
+  cursor: pointer;
+  font-size: 22px;
+  color: #909399;
+}
+
+.modal-body {
+  padding: 15px;
+}
+
+.order-detail-item {
+  display: flex;
+  margin-bottom: 10px;
+}
+
+.detail-label {
+  width: 80px;
+  color: #606266;
+  font-size: 13px;
+}
+
+.detail-value {
+  flex: 1;
+  color: #303133;
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.order-products {
+  margin-top: 15px;
+}
+
+.order-products h4 {
+  font-size: 14px;
+  margin: 0 0 10px 0;
+  color: #303133;
+}
+
+.product-list {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+}
+
+.product-list-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.product-list-item:last-child {
+  border-bottom: none;
+}
+
+.product-list-name {
+  flex: 1;
+  font-size: 13px;
+  color: #303133;
+}
+
+.product-list-quantity {
+  margin: 0 10px;
+  color: #909399;
+  font-size: 13px;
+}
+
+.product-list-price {
+  color: #ff7675;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.no-order-found {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.no-data-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: rgba(243, 156, 18, 0.15);
+  border: 2px solid rgba(243, 156, 18, 0.3);
+  color: #f39c12;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: bold;
+  margin: 0 auto 15px;
+}
+
+.no-order-found p {
+  color: #606266;
+  font-size: 14px;
+  margin: 0;
+}
+
+.status-shipped {
+  color: #3498db;
+}
+
+.status-delivered, .status-success {
+  color: #2ecc71;
+}
+
+.status-pending, .status-processing {
+  color: #f39c12;
+}
+
+.status-cancelled, .status-refunded {
+  color: #e74c3c;
 }
 
 /* 响应式设计 */
-@media (max-width: 992px) {
+@media (max-width: 768px) {
   .payment-container {
-    width: 95%;
-    padding: 20px;
+    max-width: 100%;
   }
   
   .payment-details {
     grid-template-columns: 1fr;
-    gap: 15px;
-  }
-}
-
-@media (max-width: 768px) {
-  .payment-system {
-    padding: 15px;
-    align-items: flex-start;
-  }
-  
-  .payment-container {
-    width: 100%;
-    border-radius: 10px;
-    padding: 15px;
-    gap: 15px;
-  }
-  
-  .payment-header {
-    flex-direction: column;
-    align-items: flex-start;
     gap: 10px;
-  }
-  
-  .payment-status {
-    align-self: flex-start;
-  }
-  
-  .order-info, .payment-info, .product-info {
-    padding: 15px;
   }
   
   .action-bar {
     flex-direction: column;
-    gap: 15px;
+    gap: 10px;
   }
   
   .total-amount {
@@ -462,53 +700,53 @@ const goBack = () => {
 
 @media (max-width: 480px) {
   .payment-system {
-    padding: 10px;
+    padding: 8px;
   }
   
   .payment-container {
-    padding: 12px;
-    gap: 12px;
+    padding: 10px;
+    gap: 10px;
   }
   
   .payment-header h2 {
-    font-size: 18px;
+    font-size: 16px;
   }
   
   .payment-status {
-    font-size: 12px;
-    padding: 4px 8px;
+    font-size: 11px;
+    padding: 3px 8px;
   }
   
   .payment-result-card {
-    padding: 15px;
+    padding: 12px;
   }
   
   .result-icon {
-    width: 50px;
-    height: 50px;
-    font-size: 24px;
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
   }
   
   .result-message {
-    font-size: 14px;
+    font-size: 12px;
   }
   
   .order-info h3, .payment-info h3, .product-info h3 {
-    font-size: 15px;
-    margin-bottom: 10px;
-  }
-  
-  .info-item {
+    font-size: 13px;
     margin-bottom: 8px;
   }
   
   .info-label, .info-value {
-    font-size: 13px;
+    font-size: 12px;
   }
   
   .action-button {
-    padding: 6px 12px;
-    font-size: 13px;
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+
+  .modal-content {
+    width: 95%;
   }
 }
 </style> 

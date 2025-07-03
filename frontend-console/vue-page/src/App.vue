@@ -16,7 +16,7 @@ const currentPage = ref('home')
       <HomePage v-if="currentPage === 'home'" @change="currentPage = $event" />
       <OrderManager v-if="currentPage === 'order'" />
       <ShoppingGuide v-if="currentPage === 'guide'" />
-      <PaymentSystem v-if="currentPage === 'payment'" />
+      <PaymentSystem v-if="currentPage === 'payment'" @change="currentPage = $event" />
     </main>
   </div>
 </template>

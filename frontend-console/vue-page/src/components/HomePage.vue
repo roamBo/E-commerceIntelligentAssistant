@@ -42,13 +42,20 @@
 
     <!-- 功能展示区域 -->
     <div class="features-section">
+      <!-- 添加装饰元素 -->
+      <div class="features-decoration blob-1"></div>
+      <div class="features-decoration blob-2"></div>
+      <div class="features-decoration dots-pattern"></div>
+      
       <div class="section-header">
+        <div class="section-title-decoration"></div>
         <h2>依照需求选择功能</h2>
         <p>为您的购物提供全方位的智能解决方案</p>
       </div>
       
       <div class="feature-cards">
         <div class="feature-card fly-in-bottom" :class="{ 'in-view': inView }" ref="orderCard" @click="$emit('change', 'order')">
+          <div class="card-highlight"></div>
           <div class="feature-icon">
             <span class="emoji-icon">🛒</span>
           </div>
@@ -63,6 +70,7 @@
           </div>
         </div>
         <div class="feature-card fly-in-bottom" :class="{ 'in-view': inView }" ref="guideCard" @click="$emit('change', 'guide')">
+          <div class="card-highlight"></div>
           <div class="feature-icon">
             <span class="emoji-icon">🤖</span>
           </div>
@@ -77,6 +85,7 @@
           </div>
         </div>
         <div class="feature-card fly-in-bottom" :class="{ 'in-view': inView }" ref="paymentCard" @click="$emit('change', 'payment')">
+          <div class="card-highlight"></div>
           <div class="feature-icon">
             <span class="emoji-icon">💳</span>
           </div>
@@ -95,20 +104,27 @@
 
     <!-- 解决方案区域 -->
     <div class="solutions-section">
+      <!-- 添加装饰元素 -->
+      <div class="solutions-decoration wave-line"></div>
+      <div class="solutions-decoration dots-grid"></div>
+      
       <div class="solution-item">
-        <span class="solution-number">01</span>
+        <div class="solution-icon">01</div>
         <h3>智能化管理</h3>
         <p>无需复杂操作，智能系统自动处理订单流程，让购物更轻松高效。</p>
+        <div class="solution-highlight"></div>
       </div>
       <div class="solution-item">
-        <span class="solution-number">02</span>
+        <div class="solution-icon">02</div>
         <h3>数据分析</h3>
         <p>深度分析用户行为，提供精准的营销策略和商品推荐。</p>
+        <div class="solution-highlight"></div>
       </div>
       <div class="solution-item">
-        <span class="solution-number">03</span>
+        <div class="solution-icon">03</div>
         <h3>全天候服务</h3>
         <p>AI助手24小时在线，随时解答问题，提供专业支持。</p>
+        <div class="solution-highlight"></div>
       </div>
     </div>
 
@@ -341,15 +357,384 @@ html, body {
 }
 
 .features-section {
-  min-height: auto; /* 取消最小高度限制，让内容决定高度 */
-  padding: 60px 20px; /* 减少上下内边距 */
+  min-height: auto;
+  padding: 80px 20px; /* 增加上下内边距使区域更宽敞 */
   background: #fff;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 添加features section的装饰元素 */
+.features-decoration {
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.features-decoration.blob-1 {
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle at center, rgba(64, 158, 255, 0.05) 0%, transparent 70%);
+  border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+  top: -50px;
+  left: -100px;
+  animation: blob-morph 15s ease-in-out infinite alternate;
+}
+
+.features-decoration.blob-2 {
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle at center, rgba(103, 194, 58, 0.05) 0%, transparent 70%);
+  border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+  bottom: -100px;
+  right: -150px;
+  animation: blob-morph 20s ease-in-out infinite alternate-reverse;
+}
+
+.features-decoration.dots-pattern {
+  width: 200px;
+  height: 200px;
+  background-image: radial-gradient(rgba(64, 158, 255, 0.2) 1px, transparent 1px);
+  background-size: 20px 20px;
+  top: 30%;
+  right: 10%;
+  opacity: 0.2;
+  transform: rotate(15deg);
+}
+
+@keyframes blob-morph {
+  0% {
+    border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+    transform: rotate(0deg);
+  }
+  50% {
+    border-radius: 60% 40% 50% 70% / 60% 40% 60% 40%;
+    transform: rotate(5deg);
+  }
+  100% {
+    border-radius: 40% 60% 30% 70% / 50% 60% 30% 60%;
+    transform: rotate(0deg);
+  }
+}
+
+/* 改进section标题 */
+.section-header {
+  text-align: center;
+  margin-bottom: 60px;
+  position: relative;
+  z-index: 1;
+}
+
+.section-title-decoration {
+  width: 80px;
+  height: 4px;
+  background: linear-gradient(90deg, #409EFF, #67C23A);
+  margin: 0 auto 25px;
+  border-radius: 2px;
+  position: relative;
+}
+
+.section-title-decoration::before,
+.section-title-decoration::after {
+  content: '';
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  top: -1px;
+  background: #409EFF;
+}
+
+.section-title-decoration::before {
+  left: -3px;
+}
+
+.section-title-decoration::after {
+  right: -3px;
+  background: #67C23A;
+}
+
+.section-header h2 {
+  font-size: 36px;
+  color: #2c3e50;
+  margin-bottom: 20px;
+  position: relative;
+}
+
+.section-header p {
+  color: #666;
+  font-size: 18px;
+  line-height: 1.6;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* 改进功能卡片设计 */
+.feature-cards {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 30px;
+  max-width: 1200px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
+}
+
+.feature-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 35px 30px;
+  width: 300px;
+  text-align: center;
+  transition: all 0.7s cubic-bezier(0.23, 1, 0.32, 1);
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.08);
+  opacity: 0;
+  pointer-events: none;
+  margin-bottom: 20px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+}
+
+.feature-card:hover {
+  transform: translateY(-10px) scale(1.02);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  border-color: rgba(64, 158, 255, 0.2);
+}
+
+.card-highlight {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 5px;
+  background: linear-gradient(90deg, #409EFF, #67C23A);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.feature-card:hover .card-highlight {
+  opacity: 1;
+}
+
+.feature-icon {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(64, 158, 255, 0.1) 0%, rgba(103, 194, 58, 0.1) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 30px;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.feature-card:hover .feature-icon {
+  transform: scale(1.1);
+  background: linear-gradient(135deg, rgba(64, 158, 255, 0.2) 0%, rgba(103, 194, 58, 0.2) 100%);
+}
+
+.feature-card h3 {
+  font-size: 24px;
+  color: #2c3e50;
+  margin-bottom: 25px;
+  transition: color 0.3s ease;
+  text-align: center;
+}
+
+.feature-card:hover h3 {
+  color: #409EFF;
+}
+
+.feature-list {
+  list-style: none;
+  padding: 0 10px;
+  margin: 0 0 35px;
+  text-align: left;
+}
+
+.feature-list li {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15px;
+  color: #666;
+  position: relative;
+  padding-left: 10px;
+  transition: transform 0.3s ease, color 0.3s ease;
+}
+
+.feature-card:hover .feature-list li {
+  transform: translateX(5px);
+  color: #444;
+}
+
+.feature-list li i {
+  color: #67C23A;
+  margin-right: 10px;
+  transition: transform 0.3s ease;
+}
+
+.feature-card:hover .feature-list li i {
+  transform: scale(1.2);
+}
+
+.feature-action {
+  margin-top: 30px;
+  text-align: center;
+}
+
+.action-button {
+  width: 100%;
+  height: 44px;
+  font-size: 16px;
+  border-radius: 22px;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.action-button::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: -100%;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0));
+  transition: left 0.5s ease;
+}
+
+.feature-card:hover .action-button::after {
+  left: 100%;
 }
 
 .solutions-section {
-  min-height: auto; /* 取消最小高度限制，让内容决定高度 */
-  padding: 60px 20px; /* 减少上下内边距 */
-  margin-bottom: 40px; /* 增加底部边距，避免最后内容太靠近底部 */
+  min-height: auto;
+  padding: 80px 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 30px;
+  max-width: 1200px;
+  margin: 0 auto 80px;
+  position: relative;
+}
+
+/* 解决方案区域的装饰元素 */
+.solutions-decoration {
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.solutions-decoration.wave-line {
+  width: 100%;
+  height: 50px;
+  background: linear-gradient(90deg, 
+    rgba(64, 158, 255, 0) 0%, 
+    rgba(64, 158, 255, 0.1) 20%, 
+    rgba(103, 194, 58, 0.1) 80%, 
+    rgba(103, 194, 58, 0) 100%);
+  top: -25px;
+  left: 0;
+  filter: blur(20px);
+  transform: scaleX(0.8);
+}
+
+.solutions-decoration.dots-grid {
+  width: 150px;
+  height: 150px;
+  background-image: 
+    radial-gradient(rgba(64, 158, 255, 0.15) 1px, transparent 1px),
+    radial-gradient(rgba(103, 194, 58, 0.1) 1px, transparent 1px);
+  background-size: 15px 15px, 30px 30px;
+  background-position: 0 0, 15px 15px;
+  bottom: -50px;
+  right: -20px;
+  opacity: 0.5;
+  transform: rotate(-10deg);
+}
+
+.solution-item {
+  padding: 35px;
+  background: #fff;
+  border-radius: 16px;
+  position: relative;
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  z-index: 1;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+}
+
+.solution-item:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  border-color: rgba(64, 158, 255, 0.2);
+}
+
+.solution-highlight {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #409EFF, #67C23A);
+  transition: width 0.3s ease;
+}
+
+.solution-item:hover .solution-highlight {
+  width: 100%;
+}
+
+.solution-icon {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(135deg, rgba(64, 158, 255, 0.1) 0%, rgba(103, 194, 58, 0.1) 100%);
+  color: #409EFF;
+  font-size: 28px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  margin-bottom: 20px;
+  transition: all 0.3s ease;
+}
+
+.solution-item:hover .solution-icon {
+  transform: scale(1.1) rotate(5deg);
+  background: linear-gradient(135deg, rgba(64, 158, 255, 0.2) 0%, rgba(103, 194, 58, 0.2) 100%);
+  color: #2c3e50;
+}
+
+.solution-item h3 {
+  font-size: 24px;
+  color: #2c3e50;
+  margin-bottom: 15px;
+  position: relative;
+  z-index: 1;
+  transition: color 0.3s ease;
+}
+
+.solution-item:hover h3 {
+  color: #409EFF;
+}
+
+.solution-item p {
+  color: #666;
+  line-height: 1.6;
+  position: relative;
+  z-index: 1;
+  transition: color 0.3s ease;
+}
+
+.solution-item:hover p {
+  color: #444;
 }
 
 .slogan-wrapper {
@@ -458,164 +843,6 @@ html, body {
   font-size: 16px;
 }
 
-.section-header {
-  text-align: center;
-  margin-bottom: 40px; /* 从60px减少到40px */
-}
-
-.section-header h2 {
-  font-size: 36px;
-  color: #2c3e50;
-  margin-bottom: 20px;
-}
-
-.section-header p {
-  color: #666;
-  font-size: 18px;
-}
-
-.feature-cards {
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 30px;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.feature-card {
-  background: #fff;
-  border-radius: 12px;
-  padding: 30px;
-  width: 300px;
-  text-align: center;
-  transition: all 0.7s cubic-bezier(0.23, 1, 0.32, 1);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.05);
-  opacity: 0;
-  pointer-events: none;
-  margin-bottom: 20px;
-}
-
-.feature-card:nth-child(1) {
-  transition-delay: 0.1s;
-}
-
-.feature-card:nth-child(2) {
-  transition-delay: 0.3s;
-}
-
-.feature-card:nth-child(3) {
-  transition-delay: 0.5s;
-}
-
-.feature-card.in-view {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.fly-in-left {
-  transform: translateX(-500px);
-}
-.fly-in-right {
-  transform: translateX(500px);
-}
-.fly-in-bottom {
-  transform: translateY(200px);
-}
-.feature-card.in-view.fly-in-left {
-  transform: translateX(0);
-}
-.feature-card.in-view.fly-in-right {
-  transform: translateX(0);
-}
-.feature-card.in-view.fly-in-bottom {
-  transform: translateY(0);
-}
-
-.feature-icon {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: #f5f7fa;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 30px;
-}
-
-.emoji-icon {
-  font-size: 40px;
-  line-height: 1;
-}
-
-.feature-card h3 {
-  font-size: 24px;
-  color: #2c3e50;
-  margin-bottom: 20px;
-}
-
-.feature-list {
-  list-style: none;
-  padding: 0;
-  margin: 0 0 30px;
-  text-align: left;
-}
-
-.feature-list li {
-  display: flex;
-  align-items: center;
-  margin-bottom: 15px;
-  color: #666;
-}
-
-.feature-list li i {
-  color: #409EFF;
-  margin-right: 10px;
-}
-
-.feature-action {
-  margin-top: 30px;
-}
-
-.action-button {
-  width: 100%;
-  height: 44px;
-  font-size: 16px;
-  border-radius: 22px;
-}
-
-.solution-item {
-  padding: 30px;
-  background: #fff;
-  border-radius: 12px;
-  position: relative;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.05);
-}
-
-.solution-number {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  font-size: 48px;
-  color: #f5f7fa;
-  font-weight: bold;
-}
-
-.solution-item h3 {
-  font-size: 24px;
-  color: #2c3e50;
-  margin-bottom: 15px;
-  position: relative;
-  z-index: 1;
-}
-
-.solution-item p {
-  color: #666;
-  line-height: 1.6;
-  position: relative;
-  z-index: 1;
-}
-
 @media (max-width: 1200px) {
   .feature-cards {
     justify-content: center;
@@ -654,7 +881,8 @@ html, body {
   .solutions-section {
     grid-template-columns: 1fr;
     gap: 20px;
-    padding: 40px 20px; /* 移动端更紧凑 */
+    padding: 60px 20px;
+    margin-bottom: 60px;
   }
   
   .features-section {
@@ -695,6 +923,16 @@ html, body {
     height: 40px;
     right: 8%;
     top: 25%;
+  }
+  
+  .solution-item {
+    padding: 25px;
+  }
+  
+  .solution-icon {
+    width: 50px;
+    height: 50px;
+    font-size: 22px;
   }
 }
 
@@ -763,11 +1001,11 @@ html, body {
   bottom: 30px;
   left: 50%;
   transform: translateX(-50%);
-  width: 50px;
-  height: 50px;
-  background-color: #fff;
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(135deg, #409EFF 0%, #67C23A 100%);
   border-radius: 50%;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 5px 15px rgba(64, 158, 255, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -777,32 +1015,25 @@ html, body {
   z-index: 100;
 }
 
+.scroll-indicator:hover {
+  transform: translateX(-50%) scale(1.1);
+  box-shadow: 0 8px 25px rgba(64, 158, 255, 0.5);
+}
+
 .scroll-emoji {
   font-size: 24px;
   line-height: 1;
+  color: white;
 }
 
-@keyframes bounce {
-  0%, 20%, 50%, 80%, 100% {
-    transform: translateY(0) translateX(-50%);
-  }
-  40% {
-    transform: translateY(-10px) translateX(-50%);
-  }
-  60% {
-    transform: translateY(-5px) translateX(-50%);
-  }
-}
-
-/* 响应式调整 */
 @media (max-width: 768px) {
   .home-container::-webkit-scrollbar {
     width: 4px;
   }
   
   .scroll-indicator {
-    width: 40px;
-    height: 40px;
+    width: 50px;
+    height: 50px;
     bottom: 20px;
   }
   
@@ -816,6 +1047,70 @@ html, body {
   .hero-section::after,
   .hero-decoration {
     animation: none !important;
+  }
+  
+  .solutions-decoration,
+  .scroll-indicator {
+    animation: none !important;
+  }
+  
+  .solution-item:hover,
+  .solution-item:hover .solution-icon,
+  .feature-card:hover {
+    transform: none !important;
+  }
+}
+
+.feature-card:nth-child(1) {
+  transition-delay: 0.1s;
+}
+
+.feature-card:nth-child(2) {
+  transition-delay: 0.3s;
+}
+
+.feature-card:nth-child(3) {
+  transition-delay: 0.5s;
+}
+
+.feature-card.in-view {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.fly-in-left {
+  transform: translateX(-500px);
+}
+.fly-in-right {
+  transform: translateX(500px);
+}
+.fly-in-bottom {
+  transform: translateY(200px);
+}
+.feature-card.in-view.fly-in-left {
+  transform: translateX(0);
+}
+.feature-card.in-view.fly-in-right {
+  transform: translateX(0);
+}
+.feature-card.in-view.fly-in-bottom {
+  transform: translateY(0);
+}
+
+.emoji-icon {
+  font-size: 40px;
+  line-height: 1;
+}
+
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% {
+    transform: translateY(0) translateX(-50%);
+  }
+  40% {
+    transform: translateY(-10px) translateX(-50%);
+  }
+  60% {
+    transform: translateY(-5px) translateX(-50%);
   }
 }
 </style> 
