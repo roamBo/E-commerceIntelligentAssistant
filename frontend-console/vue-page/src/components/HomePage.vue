@@ -152,24 +152,32 @@ onMounted(() => {
     });
   }, { threshold: 0.3 });
 
-  // 为每个解决方案卡片创建独立的观察器
+  // 为每个解决方案卡片创建独立的观察器，添加延迟效果
   const solutionObserver = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
       if (entry.isIntersecting) {
-        // 根据当前观察到的元素ID来设置对应的可见状态
+        // 根据当前观察到的元素ID来设置对应的可见状态，并添加延迟
         const elementId = entry.target.id;
         switch(elementId) {
           case 'solution1':
-            solution1Visible.value = true;
+            setTimeout(() => {
+              solution1Visible.value = true;
+            }, 0); // 第一个卡片立即显示
             break;
           case 'solution2':
-            solution2Visible.value = true;
+            setTimeout(() => {
+              solution2Visible.value = true;
+            }, 200); // 第二个卡片延迟200ms
             break;
           case 'solution3':
-            solution3Visible.value = true;
+            setTimeout(() => {
+              solution3Visible.value = true;
+            }, 400); // 第三个卡片延迟400ms
             break;
           case 'solution4':
-            solution4Visible.value = true;
+            setTimeout(() => {
+              solution4Visible.value = true;
+            }, 600); // 第四个卡片延迟600ms
             break;
         }
       }
@@ -744,6 +752,20 @@ html, body {
 .solution-item {
   transition-duration: 0.5s;
   transition-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* 为每个卡片设置不同的初始位置，增强错开效果 */
+.solution-1.fly-in-bottom {
+  transform: translateY(100px);
+}
+.solution-2.fly-in-bottom {
+  transform: translateY(120px);
+}
+.solution-3.fly-in-bottom {
+  transform: translateY(140px);
+}
+.solution-4.fly-in-bottom {
+  transform: translateY(160px);
 }
 
 .solution-highlight {
