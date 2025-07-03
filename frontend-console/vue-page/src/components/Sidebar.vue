@@ -1,7 +1,7 @@
 <template>
   <header class="top-navbar">
     <div class="logo-title" @click="$emit('change', 'home')" role="button">
-      <span class="logo-text">智能助手</span>
+      <span class="logo-text">智能电商助手</span>
       <div class="tech-line"></div>
     </div>
     <nav class="nav-menu">
@@ -39,10 +39,7 @@ const hoverIndex = ref(null)
 const menuItems = [
   {
     index: 'order',
-    label: '订单智能管家',
-    children: [
-      { label: '订单查询', icon: 'el-icon-search' }
-    ]
+    label: '订单智能管家'
   },
   {
     index: 'guide',
@@ -57,16 +54,7 @@ const menuItems = [
 const emit = defineEmits(['change'])
 
 const handleMenuClick = (item) => {
-  // 订单智能管家不响应点击，其他菜单项正常响应
-  if (item.index !== 'order') {
-    emit('change', item.index)
-  }
-}
-
-const handleSubmenuClick = (parentIndex, childLabel) => {
-  if (parentIndex === 'order' && childLabel === '订单查询') {
-    emit('change', 'order')
-  }
+  emit('change', item.index)
 }
 </script>
 
