@@ -1,4 +1,4 @@
-<template>
+qq<template>
   <div class="home-container">
     <!-- 主标语区域 -->
     <div class="hero-section">
@@ -93,25 +93,25 @@
       <div class="solutions-decoration wave-line"></div>
       <div class="solutions-decoration dots-grid"></div>
       
-      <div class="solution-item">
+      <div class="solution-item solution-1 fly-in-bottom" :class="{ 'in-view': solution1Visible }" ref="solution1">
         <div class="solution-icon">01</div>
         <h3>智能化管理</h3>
         <p>无需复杂操作，智能系统自动处理订单流程，让购物更轻松高效。</p>
         <div class="solution-highlight"></div>
       </div>
-      <div class="solution-item">
+      <div class="solution-item solution-2 fly-in-bottom" :class="{ 'in-view': solution2Visible }" ref="solution2">
         <div class="solution-icon">02</div>
         <h3>数据分析</h3>
         <p>深度分析用户行为，提供精准的营销策略和商品推荐。</p>
         <div class="solution-highlight"></div>
       </div>
-      <div class="solution-item">
+      <div class="solution-item solution-3 fly-in-bottom" :class="{ 'in-view': solution3Visible }" ref="solution3">
         <div class="solution-icon">03</div>
         <h3>全天候服务</h3>
         <p>AI助手24小时在线，随时解答问题，提供专业支持。</p>
         <div class="solution-highlight"></div>
       </div>
-      <div class="solution-item">
+      <div class="solution-item solution-4 fly-in-bottom" :class="{ 'in-view': solution4Visible }" ref="solution4">
         <div class="solution-icon">04</div>
         <h3>安全支付系统</h3>
         <p>多渠道支付集成，智能风控机制，确保交易数据安全，提供便捷支付体验。</p>
@@ -131,11 +131,20 @@ import { ref, onMounted, onBeforeUnmount } from 'vue';
 
 const emits = defineEmits(['change']);
 const inView = ref(false);
+const solution1Visible = ref(false);
+const solution2Visible = ref(false);
+const solution3Visible = ref(false);
+const solution4Visible = ref(false);
 const orderCard = ref(null);
 const guideCard = ref(null);
+const solution1 = ref(null);
+const solution2 = ref(null);
+const solution3 = ref(null);
+const solution4 = ref(null);
 
 onMounted(() => {
-  const observer = new window.IntersectionObserver((entries) => {
+  // 功能卡片的观察器
+  const featureObserver = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
       if (entry.isIntersecting) {
         inView.value = true;
@@ -143,12 +152,56 @@ onMounted(() => {
     });
   }, { threshold: 0.3 });
 
-  if (orderCard.value) observer.observe(orderCard.value);
-  if (guideCard.value) observer.observe(guideCard.value);
+  // 为每个解决方案卡片创建独立的观察器
+  const solutionObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        // 根据当前观察到的元素ID来设置对应的可见状态
+        const elementId = entry.target.id;
+        switch(elementId) {
+          case 'solution1':
+            solution1Visible.value = true;
+            break;
+          case 'solution2':
+            solution2Visible.value = true;
+            break;
+          case 'solution3':
+            solution3Visible.value = true;
+            break;
+          case 'solution4':
+            solution4Visible.value = true;
+            break;
+        }
+      }
+    });
+  }, { threshold: 0.2 });
+
+  // 观察功能卡片
+  if (orderCard.value) featureObserver.observe(orderCard.value);
+  if (guideCard.value) featureObserver.observe(guideCard.value);
+  
+  // 为每个解决方案卡片添加ID并单独观察
+  if (solution1.value) {
+    solution1.value.id = 'solution1';
+    solutionObserver.observe(solution1.value);
+  }
+  if (solution2.value) {
+    solution2.value.id = 'solution2';
+    solutionObserver.observe(solution2.value);
+  }
+  if (solution3.value) {
+    solution3.value.id = 'solution3';
+    solutionObserver.observe(solution3.value);
+  }
+  if (solution4.value) {
+    solution4.value.id = 'solution4';
+    solutionObserver.observe(solution4.value);
+  }
 
   // 清理 observer
   onBeforeUnmount(() => {
-    observer.disconnect();
+    featureObserver.disconnect();
+    solutionObserver.disconnect();
   });
 });
 
@@ -652,17 +705,45 @@ html, body {
   border-radius: 16px;
   position: relative;
   box-shadow: 0 15px 30px rgba(0, 0, 0, 0.08);
-  transition: all 0.3s ease;
+  transition: all 0.7s cubic-bezier(0.23, 1, 0.32, 1);
   z-index: 1;
   overflow: hidden;
   border: 1px solid rgba(0, 0, 0, 0.05);
   cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.solution-item.in-view {
+  opacity: 1;
+  transform: translate(0) !important;
+  pointer-events: auto;
+  /* 入场动画完成后，重置过渡时间，让悬浮效果更快速响应 */
+  transition: opacity 0.7s cubic-bezier(0.23, 1, 0.32, 1),
+              transform 0.7s cubic-bezier(0.23, 1, 0.32, 1),
+              box-shadow 0.3s ease,
+              border-color 0.3s ease;
 }
 
 .solution-item:hover {
-  transform: translateY(-10px);
+  transform: translateY(-10px) !important;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
   border-color: rgba(64, 158, 255, 0.2);
+  /* 为悬浮效果单独设置更短的过渡时间 */
+  transition: transform 0.3s ease, 
+              box-shadow 0.3s ease,
+              border-color 0.3s ease !important;
+}
+
+/* 解决方案卡片的飞入效果 */
+.solution-item.fly-in-bottom {
+  transform: translateY(100px);
+}
+
+/* 移除延迟效果，让每个卡片独立触发 */
+.solution-item {
+  transition-duration: 0.5s;
+  transition-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 .solution-highlight {
@@ -672,7 +753,7 @@ html, body {
   width: 0;
   height: 3px;
   background: linear-gradient(90deg, #409EFF, #67C23A);
-  transition: width 0.3s ease;
+  transition: width 0.3s ease; /* 从默认的0.3s保持不变，确保响应迅速 */
 }
 
 .solution-item:hover .solution-highlight {
@@ -699,6 +780,7 @@ html, body {
   transform: scale(1.1) rotate(5deg);
   background: linear-gradient(135deg, rgba(64, 158, 255, 0.2) 0%, rgba(103, 194, 58, 0.2) 100%);
   color: #2c3e50;
+  transition: all 0.3s ease; /* 确保图标的变换效果响应迅速 */
 }
 
 .solution-item h3 {
@@ -712,6 +794,7 @@ html, body {
 
 .solution-item:hover h3 {
   color: #409EFF;
+  transition: color 0.3s ease; /* 确保标题颜色变化响应迅速 */
 }
 
 .solution-item p {
@@ -724,6 +807,7 @@ html, body {
 
 .solution-item:hover p {
   color: #444;
+  transition: color 0.3s ease; /* 确保段落文本颜色变化响应迅速 */
 }
 
 .slogan-wrapper {
