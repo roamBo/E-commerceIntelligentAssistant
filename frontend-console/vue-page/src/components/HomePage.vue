@@ -821,6 +821,49 @@ html, body {
   line-height: 1;
 }
 
+/* 添加 emoji 動態效果 */
+.advantage-item:nth-child(1) .emoji-icon {
+  animation: gearRotate 4s linear infinite;
+  display: inline-block;
+}
+
+.advantage-item:nth-child(2) .emoji-icon {
+  animation: dataJump 2s ease-in-out infinite;
+  display: inline-block;
+}
+
+.advantage-item:nth-child(3) .emoji-icon {
+  animation: robotBounce 1.5s ease infinite;
+  display: inline-block;
+}
+
+@keyframes gearRotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes dataJump {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes robotBounce {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-5px) scale(1.03);
+  }
+}
+
 .advantage-item h4 {
   font-size: 20px;
   margin: 15px 0 10px;
