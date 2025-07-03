@@ -1,5 +1,6 @@
 <template>
   <div class="payment-system">
+    <canvas ref="bgCanvas" class="bg-particles"></canvas>
     <div class="payment-container">
       <div class="payment-header">
         <h2>支付信息</h2>
@@ -132,7 +133,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, defineEmits } from 'vue';
+import { ref, reactive, defineEmits, onMounted, onBeforeUnmount } from 'vue';
 
 // 定义事件
 const emit = defineEmits(['change']);
@@ -271,6 +272,72 @@ const goBack = () => {
   // 发射事件通知父组件切换到首页
   emit('change', 'home');
 };
+
+const bgCanvas = ref(null)
+let animationId = null
+const PARTICLE_NUM = 30
+const PARTICLE_COLOR = 'rgba(120,180,255,0.18)'
+const PARTICLE_RADIUS = [8, 18]
+const PARTICLE_SPEED = [0.1, 0.4]
+let particles = []
+
+function randomBetween(a, b) {
+  return a + Math.random() * (b - a)
+}
+
+function resizeCanvas() {
+  if (!bgCanvas.value) return
+  bgCanvas.value.width = window.innerWidth
+  bgCanvas.value.height = window.innerHeight
+}
+
+function createParticles() {
+  const w = window.innerWidth
+  const h = window.innerHeight
+  particles = Array.from({ length: PARTICLE_NUM }, () => ({
+    x: Math.random() * w,
+    y: Math.random() * h,
+    r: randomBetween(PARTICLE_RADIUS[0], PARTICLE_RADIUS[1]),
+    dx: randomBetween(-PARTICLE_SPEED[1], PARTICLE_SPEED[1]),
+    dy: randomBetween(-PARTICLE_SPEED[1], PARTICLE_SPEED[1]),
+    color: PARTICLE_COLOR
+  }))
+}
+
+function animateParticles() {
+  const ctx = bgCanvas.value.getContext('2d')
+  const w = bgCanvas.value.width
+  const h = bgCanvas.value.height
+  ctx.clearRect(0, 0, w, h)
+  for (const p of particles) {
+    p.x += p.dx
+    p.y += p.dy
+    // 边界反弹
+    if (p.x < -p.r) p.x = w + p.r
+    if (p.x > w + p.r) p.x = -p.r
+    if (p.y < -p.r) p.y = h + p.r
+    if (p.y > h + p.r) p.y = -p.r
+    ctx.beginPath()
+    ctx.arc(p.x, p.y, p.r, 0, 2 * Math.PI)
+    ctx.fillStyle = p.color
+    ctx.fill()
+  }
+  animationId = requestAnimationFrame(animateParticles)
+}
+
+onMounted(() => {
+  resizeCanvas()
+  createParticles()
+  animateParticles()
+  window.addEventListener('resize', () => {
+    resizeCanvas()
+    createParticles()
+  })
+})
+
+onBeforeUnmount(() => {
+  cancelAnimationFrame(animationId)
+})
 </script>
 
 <style scoped>
@@ -296,6 +363,8 @@ const goBack = () => {
   display: flex;
   flex-direction: column;
   gap: 15px;
+  position: relative;
+  z-index: 1;
 }
 
 .payment-header {
@@ -748,5 +817,15 @@ const goBack = () => {
   .modal-content {
     width: 95%;
   }
+}
+
+.bg-particles {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  pointer-events: none;
 }
 </style> 
