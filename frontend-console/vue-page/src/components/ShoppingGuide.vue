@@ -114,11 +114,12 @@ const input = ref('')
 const isProcessing = ref(false)
 const bgCanvas = ref(null)
 let animationId = null
-const PARTICLE_NUM = 30
-const PARTICLE_COLOR = 'rgba(120,180,255,0.18)'
-const PARTICLE_RADIUS = [8, 18]
-const PARTICLE_SPEED = [0.1, 0.4]
+const PARTICLE_NUM = 15
+const PARTICLE_COLOR = 'rgba(0,0,0,0.5)'
+const PARTICLE_RADIUS = [15, 25]
+const PARTICLE_SPEED = [0.1, 0.3]
 let particles = []
+const EMOJIS = ['🛒', '🎁', '💰', '🏷️', '📱', '💻', '👕', '👟', '⭐', '💳', '📦']
 
 function sendMsg() {
   const text = input.value.trim()
@@ -255,7 +256,9 @@ function createParticles() {
     r: randomBetween(PARTICLE_RADIUS[0], PARTICLE_RADIUS[1]),
     dx: randomBetween(-PARTICLE_SPEED[1], PARTICLE_SPEED[1]),
     dy: randomBetween(-PARTICLE_SPEED[1], PARTICLE_SPEED[1]),
-    color: PARTICLE_COLOR
+    emoji: EMOJIS[Math.floor(Math.random() * EMOJIS.length)],
+    opacity: randomBetween(0.1, 0.3),
+    rotation: Math.random() * 360
   }))
 }
 
@@ -264,19 +267,28 @@ function animateParticles() {
   const w = bgCanvas.value.width
   const h = bgCanvas.value.height
   ctx.clearRect(0, 0, w, h)
+  
   for (const p of particles) {
     p.x += p.dx
     p.y += p.dy
+    p.rotation += 0.2
     // 边界反弹
     if (p.x < -p.r) p.x = w + p.r
     if (p.x > w + p.r) p.x = -p.r
     if (p.y < -p.r) p.y = h + p.r
     if (p.y > h + p.r) p.y = -p.r
-    ctx.beginPath()
-    ctx.arc(p.x, p.y, p.r, 0, 2 * Math.PI)
-    ctx.fillStyle = p.color
-    ctx.fill()
+    
+    ctx.save()
+    ctx.translate(p.x, p.y)
+    ctx.rotate(p.rotation * Math.PI / 180)
+    ctx.font = `${p.r * 2}px Arial`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.globalAlpha = p.opacity
+    ctx.fillText(p.emoji, 0, 0)
+    ctx.restore()
   }
+  
   animationId = requestAnimationFrame(animateParticles)
 }
 </script>

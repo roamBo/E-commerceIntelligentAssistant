@@ -66,7 +66,7 @@
             <li><i class="el-icon-check"></i> 自动分类管理</li>
           </ul>
           <div class="feature-action">
-            <el-button type="primary" class="action-button" @click.stop="$emit('change', 'order')">立即使用</el-button>
+            <el-button type="primary" class="action-button" @click.stop="$emit('change', 'order')">立即查询</el-button>
           </div>
         </div>
         <div class="feature-card fly-in-bottom" :class="{ 'in-view': inView }" ref="guideCard" @click="$emit('change', 'guide')">
@@ -82,21 +82,6 @@
           </ul>
           <div class="feature-action">
             <el-button type="primary" class="action-button" @click.stop="$emit('change', 'guide')">立即使用</el-button>
-          </div>
-        </div>
-        <div class="feature-card fly-in-bottom" :class="{ 'in-view': inView }" ref="paymentCard" @click="$emit('change', 'payment')">
-          <div class="card-highlight"></div>
-          <div class="feature-icon">
-            <span class="emoji-icon">💳</span>
-          </div>
-          <h3>智能支付系统</h3>
-          <ul class="feature-list">
-            <li><i class="el-icon-check"></i> 多渠道支付集成</li>
-            <li><i class="el-icon-check"></i> 智能风控机制</li>
-            <li><i class="el-icon-check"></i> 交易数据分析</li>
-          </ul>
-          <div class="feature-action">
-            <el-button type="primary" class="action-button" @click.stop="$emit('change', 'payment')">立即使用</el-button>
           </div>
         </div>
       </div>
@@ -126,6 +111,12 @@
         <p>AI助手24小时在线，随时解答问题，提供专业支持。</p>
         <div class="solution-highlight"></div>
       </div>
+      <div class="solution-item">
+        <div class="solution-icon">04</div>
+        <h3>安全支付系统</h3>
+        <p>多渠道支付集成，智能风控机制，确保交易数据安全，提供便捷支付体验。</p>
+        <div class="solution-highlight"></div>
+      </div>
     </div>
 
     <!-- 添加滚动提示箭头 -->
@@ -142,7 +133,6 @@ const emits = defineEmits(['change']);
 const inView = ref(false);
 const orderCard = ref(null);
 const guideCard = ref(null);
-const paymentCard = ref(null);
 
 onMounted(() => {
   const observer = new window.IntersectionObserver((entries) => {
@@ -155,7 +145,6 @@ onMounted(() => {
 
   if (orderCard.value) observer.observe(orderCard.value);
   if (guideCard.value) observer.observe(guideCard.value);
-  if (paymentCard.value) observer.observe(paymentCard.value);
 
   // 清理 observer
   onBeforeUnmount(() => {
@@ -615,7 +604,7 @@ html, body {
   min-height: auto;
   padding: 80px 20px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 30px;
   max-width: 1200px;
   margin: 0 auto 80px;
@@ -852,6 +841,10 @@ html, body {
     width: calc(50% - 30px);
     min-width: 280px;
   }
+  
+  .solutions-section {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 @media (max-width: 768px) {
@@ -1067,10 +1060,6 @@ html, body {
 
 .feature-card:nth-child(2) {
   transition-delay: 0.3s;
-}
-
-.feature-card:nth-child(3) {
-  transition-delay: 0.5s;
 }
 
 .feature-card.in-view {
