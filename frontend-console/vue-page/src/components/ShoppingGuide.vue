@@ -1,106 +1,110 @@
 <template>
   <div class="shopping-guide">
-    <div class="chat-container">
-      <div class="chat-header">
-        <h2>个性化导购助手</h2>
-        <el-button 
-          v-if="messages.length > 0" 
-          type="text" 
-          icon="el-icon-delete" 
-          @click="clearChat"
-          class="clear-btn"
-        >清除对话</el-button>
-      </div>
-      <div class="chat-body" ref="chatBody">
-        <!-- 欢迎消息 -->
-        <div class="welcome-message" v-if="messages.length === 0">
-          <div class="ai-avatar">
-            <span class="emoji-avatar">🤖</span>
-          </div>
-          <div class="welcome-content">
-            <h3>您好！我是您的个性化导购助手</h3>
-            <p class="welcome-hint">您可以直接告诉我您需要什么商品，我将帮您完成推荐商品、购买下单、支付和物流跟踪的全流程服务。</p>
-            <div class="quick-actions">
-              <el-button size="small" @click="quickSend('如何使用这个导购助手？')">如何使用导购助手</el-button>
-              <el-button size="small" @click="quickSend('你能提供哪些服务？')">查看服务范围</el-button>
-              <el-button size="small" @click="quickSend('联系客服')">联系客服</el-button>
-            </div>
-          </div>
+    <canvas ref="bgCanvas" class="bg-particles"></canvas>
+    <div class="guide-content">
+      <div class="chat-container">
+        <div class="chat-header">
+          <h2>个性化导购助手</h2>
+          <el-button
+              v-if="messages.length > 0"
+              type="text"
+              icon="el-icon-delete"
+              @click="clearChat"
+              class="clear-btn"
+          >清除对话</el-button>
         </div>
-        
-        <!-- 聊天消息 -->
-        <div 
-          v-for="(message, index) in messages" 
-          :key="index" 
-          :class="['message-item', message.role === 'user' ? 'user-message' : 'ai-message']"
-        >
-          <div v-if="message.role !== 'user'" class="ai-avatar">
-            <span class="emoji-avatar">🤖</span>
-          </div>
-          <div class="message-content">
-            <div v-if="message.thinking && message.role !== 'user'" class="thinking-dots">
-              <span></span><span></span><span></span>
+        <div class="chat-body" ref="chatBody">
+          <!-- 欢迎消息 -->
+          <div class="welcome-message" v-if="messages.length === 0">
+            <div class="ai-avatar">
+              <span class="emoji-avatar">🤖</span>
             </div>
-            <div v-else-if="message.type === 'orders'">
-              <div class="orders-list">
-                <div v-for="(order, i) in message.orders" :key="i" class="product-card">
-                  <div class="product-details">
-                    <h4>{{ order.name }}</h4>
-                    <div class="product-meta">
-                      <span class="product-stock">数量: {{ order.count }}</span>
-                    </div>
-                    <div class="product-price-container">
-                      <span class="product-price">¥{{ order.price }}</span>
+            <div class="welcome-content">
+              <h3>您好！我是您的个性化导购助手</h3>
+              <p class="welcome-hint">您可以直接告诉我您需要什么商品，我将帮您完成推荐商品、购买下单、支付和物流跟踪的全流程服务。</p>
+              <div class="quick-actions">
+                <el-button size="small" @click="quickSend('如何使用这个导购助手？')">如何使用导购助手</el-button>
+                <el-button size="small" @click="quickSend('你能提供哪些服务？')">查看服务范围</el-button>
+                <el-button size="small" @click="quickSend('联系客服')">联系客服</el-button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 聊天消息 -->
+          <div
+              v-for="(message, index) in messages"
+              :key="index"
+              :class="['message-item', message.role === 'user' ? 'user-message' : 'ai-message']"
+          >
+            <div v-if="message.role !== 'user'" class="ai-avatar">
+              <span class="emoji-avatar">🤖</span>
+            </div>
+            <div class="message-content">
+              <div v-if="message.thinking && message.role !== 'user'" class="thinking-dots">
+                <span></span><span></span><span></span>
+              </div>
+              <div v-else-if="message.type === 'orders'">
+                <div class="orders-list">
+                  <div v-for="(order, i) in message.orders" :key="i" class="product-card">
+                    <div class="product-details">
+                      <h4>{{ order.name }}</h4>
+                      <div class="product-meta">
+                        <span class="product-stock">数量: {{ order.count }}</span>
+                      </div>
+                      <div class="product-price-container">
+                        <span class="product-price">¥{{ order.price }}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
+              <div v-else v-html="formatMessage(message.text)"></div>
             </div>
-            <div v-else v-html="formatMessage(message.text)"></div>
-          </div>
-          <div v-if="message.role === 'user'" class="user-avatar">
-            <span class="emoji-avatar">👤</span>
+            <div v-if="message.role === 'user'" class="user-avatar">
+              <span class="emoji-avatar">👤</span>
+            </div>
           </div>
         </div>
+
+        <div class="chat-input">
+          <el-input
+              v-model="input"
+              placeholder="请描述您想找的商品或询问导购助手..."
+              @keyup.enter="sendMsg"
+              :disabled="isProcessing"
+              clearable
+          >
+            <template #append>
+              <el-button
+                  :icon="isProcessing ? 'el-icon-loading' : 'el-icon-s-promotion'"
+                  @click="sendMsg"
+                  :disabled="!input.trim() || isProcessing"
+              >发送</el-button>
+            </template>
+          </el-input>
+        </div>
       </div>
-      
-      <div class="chat-input">
-        <el-input
-          v-model="input"
-          placeholder="请描述您想找的商品或询问导购助手..."
-          @keyup.enter="sendMsg"
-          :disabled="isProcessing"
-          clearable
-        >
-          <template #append>
-            <el-button 
-              :icon="isProcessing ? 'el-icon-loading' : 'el-icon-s-promotion'" 
-              @click="sendMsg" 
-              :disabled="!input.trim() || isProcessing"
-            >发送</el-button>
-          </template>
-        </el-input>
-      </div>
-    </div>
-    
-    <!-- 侧边快捷功能 -->
-    <div class="side-panel">
-      <div class="side-card" @click="quickSend('帮我查一下我下了什么订单', true)">
-        <div class="side-icon">🛒</div>
-        <div class="side-title">订单查询</div>
-        <div class="side-desc">一键查询我的所有订单</div>
-      </div>
-      <div class="side-card" @click="quickSend('帮我查一下我要付多少钱')">
-        <div class="side-icon">💰</div>
-        <div class="side-title">支付查询</div>
-        <div class="side-desc">快速查看应付金额</div>
+
+      <!-- 侧边快捷功能 -->
+      <div class="side-panel">
+        <div class="side-card" @click="quickSend('帮我查一下我下了什么订单', true)">
+          <div class="side-icon">🛒</div>
+          <div class="side-title">订单查询</div>
+          <div class="side-desc">一键查询我的所有订单</div>
+        </div>
+        <div class="side-card" @click="quickSend('帮我查一下我要付多少钱')">
+          <div class="side-icon">💰</div>
+          <div class="side-title">支付查询</div>
+          <div class="side-desc">快速查看应付金额</div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, nextTick, watch, onMounted } from 'vue'
+import { ref, nextTick, watch, onMounted, onBeforeUnmount } from 'vue'
+// import ParticleAnimation from './ParticleAnimation.vue'
 
 const chatBody = ref(null)
 const messages = ref([
@@ -108,11 +112,18 @@ const messages = ref([
 ])
 const input = ref('')
 const isProcessing = ref(false)
+const bgCanvas = ref(null)
+let animationId = null
+const PARTICLE_NUM = 30
+const PARTICLE_COLOR = 'rgba(120,180,255,0.18)'
+const PARTICLE_RADIUS = [8, 18]
+const PARTICLE_SPEED = [0.1, 0.4]
+let particles = []
 
 function sendMsg() {
   const text = input.value.trim()
   if (!text || isProcessing.value) return
-  
+
   handleUserInput(text)
   input.value = ''
   scrollToBottom()
@@ -120,26 +131,26 @@ function sendMsg() {
 
 function quickSend(text, isOrder) {
   if (isProcessing.value) return
-  
+
   handleUserInput(text, isOrder)
   scrollToBottom()
 }
 
 function handleUserInput(text, isOrder) {
   messages.value.push({ role: 'user', text })
-  
+
   // 添加思考状态
   isProcessing.value = true
-  
+
   if (text.includes('订单')) {
     fetchOrders()
   } else if (text.includes('付钱') || text.includes('付多少')) {
     fetchTotal()
   } else {
     setTimeout(() => {
-      messages.value.push({ 
-        role: 'bot', 
-        text: '我们需要集成实际的API来处理您的请求。目前系统正在准备中，暂时无法处理具体业务。请稍后再试，或联系客服获取更多帮助。' 
+      messages.value.push({
+        role: 'bot',
+        text: '我们需要集成实际的API来处理您的请求。目前系统正在准备中，暂时无法处理具体业务。请稍后再试，或联系客服获取更多帮助。'
       })
       isProcessing.value = false
       scrollToBottom()
@@ -155,13 +166,13 @@ function fetchOrders() {
       { name: '无线蓝牙耳机', count: 2, price: 499 },
       { name: '智能手表', count: 1, price: 1299 }
     ]
-    
+
     messages.value.push({
       role: 'bot',
       type: 'orders',
       orders: mockOrders
     })
-    
+
     isProcessing.value = false
     scrollToBottom()
   }, 800)
@@ -171,11 +182,11 @@ function fetchTotal() {
   // 模拟获取订单总额
   setTimeout(() => {
     const total = 6999 + (499 * 2) + 1299
-    messages.value.push({ 
-      role: 'bot', 
-      text: `您所有订单应付总金额为：¥${total}` 
+    messages.value.push({
+      role: 'bot',
+      text: `您所有订单应付总金额为：¥${total}`
     })
-    
+
     isProcessing.value = false
     scrollToBottom()
   }, 800)
@@ -192,8 +203,8 @@ const clearChat = () => {
 const formatMessage = (message) => {
   if (!message) return ''
   return message
-    .replace(/\n/g, '<br>')
-    .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank">$1</a>')
+      .replace(/\n/g, '<br>')
+      .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank">$1</a>')
 }
 
 // 滚动到底部
@@ -211,35 +222,99 @@ watch(messages, () => {
 
 // 组件挂载时滚动到底部
 onMounted(() => {
+  resizeCanvas()
+  createParticles()
+  animateParticles()
+  window.addEventListener('resize', () => {
+    resizeCanvas()
+    createParticles()
+  })
   scrollToBottom()
 })
+
+onBeforeUnmount(() => {
+  cancelAnimationFrame(animationId)
+})
+
+function randomBetween(a, b) {
+  return a + Math.random() * (b - a)
+}
+
+function resizeCanvas() {
+  if (!bgCanvas.value) return
+  bgCanvas.value.width = window.innerWidth
+  bgCanvas.value.height = window.innerHeight
+}
+
+function createParticles() {
+  const w = window.innerWidth
+  const h = window.innerHeight
+  particles = Array.from({ length: PARTICLE_NUM }, () => ({
+    x: Math.random() * w,
+    y: Math.random() * h,
+    r: randomBetween(PARTICLE_RADIUS[0], PARTICLE_RADIUS[1]),
+    dx: randomBetween(-PARTICLE_SPEED[1], PARTICLE_SPEED[1]),
+    dy: randomBetween(-PARTICLE_SPEED[1], PARTICLE_SPEED[1]),
+    color: PARTICLE_COLOR
+  }))
+}
+
+function animateParticles() {
+  const ctx = bgCanvas.value.getContext('2d')
+  const w = bgCanvas.value.width
+  const h = bgCanvas.value.height
+  ctx.clearRect(0, 0, w, h)
+  for (const p of particles) {
+    p.x += p.dx
+    p.y += p.dy
+    // 边界反弹
+    if (p.x < -p.r) p.x = w + p.r
+    if (p.x > w + p.r) p.x = -p.r
+    if (p.y < -p.r) p.y = h + p.r
+    if (p.y > h + p.r) p.y = -p.r
+    ctx.beginPath()
+    ctx.arc(p.x, p.y, p.r, 0, 2 * Math.PI)
+    ctx.fillStyle = p.color
+    ctx.fill()
+  }
+  animationId = requestAnimationFrame(animateParticles)
+}
 </script>
 
 <style scoped>
+/* .particle-bg {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  pointer-events: none;
+} */
 .shopping-guide {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: #f5f7fa;
+  min-height: 100vh;
+  width: 100vw;
   position: relative;
   overflow: hidden;
+  background: #f5f7fa;
 }
-
-.shopping-guide::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: none;
-  z-index: 0;
+.guide-content {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 }
 
 .chat-container {
   max-width: 900px;
-  width: 100%;
-  height: 100%;
+  width: 900px;
+  height: 600px;
+  min-height: 600px;
+  max-height: 600px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -309,6 +384,7 @@ onMounted(() => {
   gap: 24px;
   scrollbar-width: thin;
   scrollbar-color: rgba(144, 147, 153, 0.3) rgba(245, 247, 250, 0.2);
+  min-height: 0;
 }
 
 .chat-body::-webkit-scrollbar {
@@ -669,7 +745,7 @@ onMounted(() => {
     width: 90%;
     max-width: 900px;
   }
-  
+
   .side-card {
     width: calc(33.33% - 14px);
   }
@@ -680,53 +756,53 @@ onMounted(() => {
     border-radius: 0;
     max-width: 100%;
   }
-  
+
   .message-item {
     max-width: 95%;
   }
-  
+
   .side-panel {
     flex-direction: column;
     align-items: center;
     width: 100%;
   }
-  
+
   .side-card {
     width: 90%;
     max-width: 300px;
   }
-  
+
   .chat-header {
     padding: 12px 16px;
   }
-  
+
   .chat-header h2 {
     font-size: 18px;
   }
-  
+
   .chat-body {
     padding: 16px;
     gap: 16px;
   }
-  
+
   .chat-input {
     padding: 16px;
   }
-  
+
   .welcome-message {
     flex-direction: column;
     padding: 20px 15px;
   }
-  
+
   .ai-avatar, .user-avatar {
     margin: 0 auto 15px auto;
   }
-  
+
   .quick-actions {
     flex-wrap: wrap;
     justify-content: center;
   }
-  
+
   .product-card {
     flex-direction: column;
   }
@@ -737,44 +813,54 @@ onMounted(() => {
   .chat-header h2 {
     font-size: 16px;
   }
-  
+
   .chat-body {
     padding: 12px;
     gap: 12px;
   }
-  
+
   .message-content {
     padding: 10px 14px;
     font-size: 13px;
   }
-  
+
   .welcome-content h3 {
     font-size: 16px;
   }
-  
+
   .welcome-hint {
     font-size: 13px;
   }
-  
+
   .quick-actions .el-button {
     font-size: 12px;
     padding: 6px 10px;
   }
-  
+
   .side-panel {
     margin: 15px auto;
   }
-  
+
   .side-card {
     padding: 12px;
   }
-  
+
   .side-title {
     font-size: 14px;
   }
-  
+
   .side-desc {
     font-size: 11px;
   }
+}
+
+.bg-particles {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  pointer-events: none;
 }
 </style> 
