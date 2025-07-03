@@ -68,6 +68,7 @@
 
         <div class="chat-input">
           <el-input
+              ref="inputField"
               v-model="input"
               placeholder="请描述您想找的商品或询问导购助手..."
               @keyup.enter="sendMsg"
@@ -107,6 +108,7 @@ import { ref, nextTick, watch, onMounted, onBeforeUnmount } from 'vue'
 // import ParticleAnimation from './ParticleAnimation.vue'
 
 const chatBody = ref(null)
+const inputField = ref(null)
 const messages = ref([
   { role: 'bot', text: '您好，有什么可以帮您？' }
 ])
@@ -128,6 +130,7 @@ function sendMsg() {
   handleUserInput(text)
   input.value = ''
   scrollToBottom()
+  focusInput()
 }
 
 function quickSend(text, isOrder) {
@@ -135,6 +138,7 @@ function quickSend(text, isOrder) {
 
   handleUserInput(text, isOrder)
   scrollToBottom()
+  focusInput()
 }
 
 function handleUserInput(text, isOrder) {
@@ -155,8 +159,18 @@ function handleUserInput(text, isOrder) {
       })
       isProcessing.value = false
       scrollToBottom()
+      focusInput()
     }, 600)
   }
+}
+
+// 自动聚焦输入框
+function focusInput() {
+  nextTick(() => {
+    if (inputField.value) {
+      inputField.value.focus()
+    }
+  })
 }
 
 function fetchOrders() {
@@ -176,6 +190,7 @@ function fetchOrders() {
 
     isProcessing.value = false
     scrollToBottom()
+    focusInput()
   }, 800)
 }
 
@@ -190,6 +205,7 @@ function fetchTotal() {
 
     isProcessing.value = false
     scrollToBottom()
+    focusInput()
   }, 800)
 }
 
@@ -198,6 +214,7 @@ const clearChat = () => {
   messages.value = [
     { role: 'bot', text: '您好，有什么可以帮您？' }
   ]
+  focusInput()
 }
 
 // 格式化消息，处理换行和链接
@@ -221,7 +238,7 @@ watch(messages, () => {
   scrollToBottom()
 }, { deep: true })
 
-// 组件挂载时滚动到底部
+// 组件挂载时滚动到底部和聚焦输入框
 onMounted(() => {
   resizeCanvas()
   createParticles()
@@ -231,6 +248,7 @@ onMounted(() => {
     createParticles()
   })
   scrollToBottom()
+  focusInput()
 })
 
 onBeforeUnmount(() => {
