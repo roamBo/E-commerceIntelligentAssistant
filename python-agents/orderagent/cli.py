@@ -1,66 +1,43 @@
-# cli.py
-import sys
+# cli.py（保留 Rich 但简化标签）
 import os
-import asyncio
-import json
+import sys
+from rich.console import Console
+from rich.prompt import Prompt
 
 # 解决导入路径问题
 root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(root_dir)
 
 from core.agent import OrderAgent
-from app_config import settings
+
+console = Console()
 
 
 def main():
-    """命令行交互入口"""
-    print("=" * 50)
-    print(" 欢迎使用电商订单助手 - 命令行交互模式 ")
-    print("=" * 50)
-    print("输入 'exit' 退出对话")
-    print("支持创建、修改、取消、退款订单，查询订单状态和物流信息")
-    print("-" * 50)
-
-    # 初始化Agent
+    # 初始化代理
     agent = OrderAgent()
 
-    # 使用配置中的文件路径
-    chat_history_file = settings.CHAT_HISTORY_FILE
+    console.print("[bold green]===== 订单处理助手已启动 =====")
+    console.print("输入 [bold]exit[/bold], [bold]quit[/bold] 或 [bold]bye[/bold] 退出")
+    console.print("输入 [bold]clear[/bold] 清空聊天记录")
 
-    # 确保目录存在
-    directory = os.path.dirname(chat_history_file)
-    if not os.path.exists(directory):
-        os.makedirs(directory, exist_ok=True)
+    try:
+        # 主循环
+        while True:
+            # 修改此处：使用单个样式标签
+            user_input = Prompt.ask("\n[blue]你[/blue]")
+            if user_input.lower() in ["exit", "quit", "bye"]:
+                break
+            elif user_input.lower() == "clear":
+                agent.clear_chat_history()
+            else:
+                response = agent.run(user_input)
+                console.print(f"\n[green]助手[/green]: {response}\n")
 
-    # 初始化订单ID为None
-    order_id = None
-
-    while True:
-        # 获取用户输入
-        user_input = input("\n你: ").strip()
-
-        # 退出条件
-        if user_input.lower() in ["exit", "quit", "bye"]:
-            print("助手: 再见！")
-            agent.save_chat_history_to_file(chat_history_file)
-            print(f"对话历史已保存到: {chat_history_file}")
-            break
-
-        # 检查是否为订单ID（格式为ORD+5位数字）
-        if user_input.startswith("ORD") and len(user_input) == 9:
-            order_id = user_input
-            print(f"助手: 已记录订单ID: {order_id}")
-            continue
-
-        # 构建带订单ID的完整输入（仅当order_id已设置时）
-        full_input = f"订单ID: {order_id}. {user_input}" if order_id else user_input
-
-        # 获取Agent回复
-        response = agent.run(full_input)
-        print(f"助手: {response}")
-
-        # 保存对话历史到文件
-        agent.save_chat_history_to_file(chat_history_file)
+    finally:
+        # 保存聊天记录到 Redis
+        agent._save_chat_history()
+        console.print("[yellow]聊天记录已保存到 Redis[/yellow]")
 
 
 if __name__ == "__main__":

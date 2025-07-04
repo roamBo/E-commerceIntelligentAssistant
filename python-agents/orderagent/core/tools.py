@@ -1,4 +1,4 @@
-# core/tools.py（无警告版本）
+# core/tools.py
 from langchain.tools import Tool
 from typing import Optional
 
@@ -12,7 +12,7 @@ def create_order(input: str) -> str:
         return "参数格式错误，请使用：商品名称,数量,收货地址,支付方式"
 
     order_id = f"ORD-{hash(product_name + address) % 1000000:06d}"
-    return (f"已成功创建订单 {order_id}：\n"
+    return (f"已成功创建订单 {order_id} 并完成支付：\n"
             f"- 商品: {product_name.strip()} x {quantity}\n"
             f"- 收货地址: {address.strip()}\n"
             f"- 支付方式: {payment_method.strip()}\n\n"
@@ -30,7 +30,7 @@ def modify_order(input: str) -> str:
 
 def query_order_status(order_id: str) -> str:
     """查询订单状态，参数：订单ID"""
-    statuses = ["已下单", "已支付", "已发货", "已签收", "已取消"]
+    statuses = ["已支付", "已发货", "已签收", "已取消"]  # 移除未支付状态
     status = statuses[hash(order_id) % len(statuses)]
     return f"订单 {order_id} 当前状态：{status}"
 
