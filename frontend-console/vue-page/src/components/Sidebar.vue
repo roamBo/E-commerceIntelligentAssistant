@@ -6,6 +6,30 @@
       @click="handleLogoClick" 
       role="button"
     >
+      <div class="animated-logo">
+        <svg width="38" height="38" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="28" stroke="url(#outerGradient)" stroke-width="4" fill="none" class="logo-ring-outer"/>
+          <circle cx="32" cy="32" r="20" stroke="url(#innerGradient)" stroke-width="2.5" fill="none" class="logo-ring-inner"/>
+          <circle cx="32" cy="32" r="6" fill="#64ffda" class="logo-dot-pulse" filter="url(#glow)"/>
+          <defs>
+            <linearGradient id="outerGradient" x1="0" y1="0" x2="64" y2="64">
+              <stop offset="0%" stop-color="#64ffda"/>
+              <stop offset="100%" stop-color="#1de9b6"/>
+            </linearGradient>
+            <linearGradient id="innerGradient" x1="64" y1="0" x2="0" y2="64">
+              <stop offset="0%" stop-color="#fff"/>
+              <stop offset="100%" stop-color="#64ffda"/>
+            </linearGradient>
+            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+              <feMerge>
+                <feMergeNode in="coloredBlur"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+          </defs>
+        </svg>
+      </div>
       <span class="logo-text">智能电商助手</span>
       <div v-if="activeIndex === 'home'" class="active-indicator">
         <div class="tech-line"></div>
@@ -106,7 +130,8 @@ onMounted(() => {
 
 .logo-title {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
   margin-right: 48px;
   position: relative;
   cursor: pointer;
@@ -127,12 +152,21 @@ onMounted(() => {
   text-shadow: 0 0 20px rgba(100, 255, 218, 0.5);
 }
 
+.animated-logo {
+  display: inline-block;
+  vertical-align: middle;
+  width: 38px;
+  height: 38px;
+  margin-right: 10px;
+}
+
 .logo-text {
   font-size: 1.5em;
   font-weight: bold;
   color: #64ffda;
   text-shadow: 0 0 10px rgba(100, 255, 218, 0.3);
   letter-spacing: 2px;
+  margin-right: 0;
 }
 
 .tech-line {
@@ -381,5 +415,35 @@ onMounted(() => {
 .login-icon:hover {
   background: rgba(100,255,218,0.12);
   color: #fff;
+}
+
+.logo-ring-outer {
+  stroke-dasharray: 180;
+  stroke-dashoffset: 0;
+  transform-origin: 50% 50%;
+  animation: ring-rotate-outer 2s linear infinite;
+}
+@keyframes ring-rotate-outer {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.logo-ring-inner {
+  stroke-dasharray: 120;
+  stroke-dashoffset: 0;
+  transform-origin: 50% 50%;
+  animation: ring-rotate-inner 4s linear infinite reverse;
+}
+@keyframes ring-rotate-inner {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.logo-dot-pulse {
+  animation: dot-pulse 1.2s ease-in-out infinite alternate;
+  filter: url(#glow);
+}
+@keyframes dot-pulse {
+  0% { r: 6; opacity: 1; }
+  70% { r: 10; opacity: 0.7; }
+  100% { r: 6; opacity: 1; }
 }
 </style> 
