@@ -5,7 +5,6 @@ from pydantic_settings import BaseSettings
 
 load_dotenv()
 
-
 class Settings(BaseSettings):
     # 模型配置
     API_KEY: str = os.getenv("API_KEY", "")
@@ -20,5 +19,9 @@ class Settings(BaseSettings):
     CHAT_HISTORY_DIR: str = os.path.join(os.getcwd(), 'data')
     CHAT_HISTORY_FILE: str = os.path.join(CHAT_HISTORY_DIR, 'chat_history.json')
 
+    # Redis 配置
+    REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")
+    REDIS_PORT: int = int(os.getenv("REDIS_PORT", 6379))
+    REDIS_DB: int = int(os.getenv("REDIS_DB", 0))
 
 settings = Settings()
