@@ -19,7 +19,7 @@
         <div class="advantage-item advantage-item-1">
           <div class="advantage-icon">
             <div class="gear-wrapper">
-              <span class="emoji-icon">⚙️</span>
+            <span class="emoji-icon">⚙️</span>
             </div>
           </div>
           <h4>智能化处理</h4>
@@ -881,7 +881,7 @@ html, body {
 
 .advantage-icon {
   border-radius: 50%;
-  background: #fff;
+  background: #fff !important;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1109,18 +1109,6 @@ html, body {
   .advantage-item-3 .advantage-icon {
     width: 85px;
     height: 85px;
-  }
-  
-  .advantage-item-1 .emoji-icon {
-    font-size: 54px; /* 移动端齿轮emoji尺寸 */
-  }
-  
-  .advantage-item-2 .emoji-icon {
-    font-size: 42px;
-  }
-  
-  .advantage-item-3 .emoji-icon {
-    font-size: 34px;
   }
   
   .hero-section {
@@ -1397,5 +1385,41 @@ html, body {
   60% {
     transform: translateY(-5px) translateX(-50%);
   }
+}
+
+.advantage-icon, .advantage-item-1 .gear-wrapper {
+  background: #fff !important;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+}
+
+.advantage-item-1 .gear-wrapper {
+  background: #fff !important;
+  border-radius: 50%;
+}
+
+.advantage-item-1 .advantage-icon {
+  background: #fff !important;
+  border-radius: 50%;
+}
+
+.advantage-item-1 .advantage-icon::before {
+  background: rgba(64, 158, 255, 0.05);
+}
+
+.advantage-item-1 .advantage-icon,
+.advantage-item-1 .gear-wrapper {
+  background: #fff !important;
+}
+
+.advantage-item-1 .advantage-icon {
+  background: #fff !important;
+}
+
+.advantage-item-1 .gear-wrapper {
+  background: #fff !important;
+}
+
+.advantage-item-1 .emoji-icon {
+  background: transparent !important;
 }
 </style> 
