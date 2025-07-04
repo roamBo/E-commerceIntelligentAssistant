@@ -40,6 +40,9 @@
         </transition>
       </div>
     </nav>
+    <div class="login-icon" @click="handleLoginClick" title="点击登录">
+      <svg width="28" height="28" viewBox="0 0 1024 1024" fill="none"><path d="M512 512c105.9 0 192-86.1 192-192S617.9 128 512 128 320 214.1 320 320s86.1 192 192 192zm0 64c-123.7 0-384 62.2-384 186.7V896c0 17.7 14.3 32 32 32h704c17.7 0 32-14.3 32-32v-133.3C896 638.2 635.7 576 512 576z" fill="#64ffda"/></svg>
+    </div>
   </header>
 </template>
 
@@ -64,7 +67,7 @@ const menuItems = [
   }
 ]
 
-const emit = defineEmits(['change'])
+const emit = defineEmits(['change', 'login'])
 
 const handleMenuClick = (item) => {
   activeIndex.value = item.index
@@ -74,6 +77,10 @@ const handleMenuClick = (item) => {
 const handleLogoClick = () => {
   activeIndex.value = 'home'
   emit('change', 'home')
+}
+
+const handleLoginClick = () => {
+  emit('login')
 }
 
 onMounted(() => {
@@ -358,5 +365,21 @@ onMounted(() => {
   .dropdown-item i {
     margin-right: 5px;
   }
+}
+
+.login-icon {
+  margin-left: auto;
+  color: #64ffda;
+  font-size: 1.7em;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 50%;
+  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+}
+.login-icon:hover {
+  background: rgba(100,255,218,0.12);
+  color: #fff;
 }
 </style> 
