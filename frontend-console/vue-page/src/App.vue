@@ -5,18 +5,30 @@ import HomePage from './components/HomePage.vue'
 import OrderManager from './components/OrderManager.vue'
 import ShoppingGuide from './components/ShoppingGuide.vue'
 import PaymentSystem from './components/PaymentSystem.vue'
+import LoginPage from './components/LoginPage.vue'
 
 const currentPage = ref('home')
+
+const handleSidebarChange = (page) => {
+  currentPage.value = page
+}
+const handleSidebarLogin = () => {
+  currentPage.value = 'login'
+}
+const handleLoginSuccess = () => {
+  currentPage.value = 'home'
+}
 </script>
 
 <template>
   <div class="app-container">
-    <Sidebar @change="currentPage = $event" />
+    <Sidebar @change="handleSidebarChange" @login="handleSidebarLogin" />
     <main class="main-content">
       <HomePage v-if="currentPage === 'home'" @change="currentPage = $event" />
       <OrderManager v-if="currentPage === 'order'" />
       <ShoppingGuide v-if="currentPage === 'guide'" />
       <PaymentSystem v-if="currentPage === 'payment'" @change="currentPage = $event" />
+      <LoginPage v-if="currentPage === 'login'" @login="handleLoginSuccess" />
     </main>
   </div>
 </template>
