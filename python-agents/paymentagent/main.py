@@ -19,14 +19,8 @@ def main():
     # 设置日志
     setup_logging()
 
-    # 加载配置
-    config = PaymentConfig()
-
     # 创建支付代理
-    payment_agent = PaymentAgent(
-        api_key=config.SILICONFLOW_API_KEY,
-        base_url=config.SILICONFLOW_BASE_URL
-    )
+    payment_agent = PaymentAgent()
 
     # 示例对话
     test_requests = [

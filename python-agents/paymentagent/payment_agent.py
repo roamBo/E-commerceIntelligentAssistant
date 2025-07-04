@@ -1,34 +1,39 @@
-from langchain.llms import OpenAI
-from langchain.agents import Tool, AgentExecutor, create_react_agent
-from langchain.prompts import PromptTemplate
-from langchain.memory import ConversationBufferMemory
-from typing import Dict, Any, Optional
+from langchain_openai import ChatOpenAI
+from langchain_core.tools import tool
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
+from langchain_core.memory import ConversationBufferMemory
+from langchain_core.runnables import RunnablePassthrough
+from langchain.agents import create_tool_calling_agent, AgentExecutor
+from typing import Dict, Any, Optional, List
 import json
 import logging
+from config import PaymentConfig
 
 class PaymentAgent:
     """
     支付代理类 - 负责处理支付和退款相关业务
-    使用硅基流动API通过OpenAI接口调用DeepSeek模型
+    使用硅基流动API通过ChatOpenAI接口调用DeepSeek模型
     """
 
-    def __init__(self, api_key: str, base_url: str = "https://api.siliconflow.cn/v1"):
+    def __init__(self, config: PaymentConfig = None):
         """
         初始化支付代理
 
         Args:
-            api_key: 硅基流动的API密钥
-            base_url: API基础URL，默认为硅基流动地址
+            config: 配置对象，如果不提供则使用默认配置
         """
+        self.config = config or PaymentConfig()
         self.logger = logging.getLogger(__name__)
 
         # 初始化DeepSeek模型，通过硅基流动API调用
-        self.llm = OpenAI(
-            openai_api_key=api_key,
-            openai_api_base=base_url,
-            model_name="Pro/deepseek-ai/DeepSeek-R1",  # 根据硅基流动支持的模型名称调整
-            temperature=0.1,  # 降低温度以提高准确性
-            # max_tokens=2000
+        self.llm = ChatOpenAI(
+            api_key=self.config.SILICONFLOW_API_KEY,
+            base_url=self.config.SILICONFLOW_BASE_URL,
+            model=self.config.MODEL_NAME,
+            temperature=self.config.MODEL_TEMPERATURE,
+            max_tokens=self.config.MAX_TOKENS,
+            timeout=30
         )
 
         # 初始化对话记忆
@@ -50,86 +55,101 @@ class PaymentAgent:
             memory=self.memory,
             verbose=True,
             handle_parsing_errors=True,
-            max_iterations=5
+            max_iterations=3,
+            return_intermediate_steps=True
         )
 
-    def _create_tools(self) -> list:
+    def _create_tools(self) -> List:
         """
         创建支付相关工具集
 
         Returns:
-            list: 工具列表
+            List: 工具列表
         """
-        tools = [
-            Tool(
-                name="process_payment",
-                description="处理支付请求。输入格式: {'amount': 金额, 'currency': 币种, 'payment_method': 支付方式, 'user_id': 用户ID}",
-                func=self._process_payment
-            ),
-            Tool(
-                name="process_refund",
-                description="处理退款请求。输入格式: {'transaction_id': 交易ID, 'amount': 退款金额, 'reason': 退款原因}",
-                func=self._process_refund
-            ),
-            Tool(
-                name="check_payment_status",
-                description="查询支付状态。输入格式: {'transaction_id': 交易ID}",
-                func=self._check_payment_status
-            ),
-            Tool(
-                name="validate_payment_info",
-                description="验证支付信息。输入格式: {'payment_data': 支付数据字典}",
-                func=self._validate_payment_info
-            )
-        ]
-        return tools
+        # 使用 tool 装饰器创建工具
+        @tool
+        def process_payment(payment_data: str) -> str:
+            """
+            处理支付请求
+            
+            Args:
+                payment_data: JSON格式的支付信息，包含 amount(金额), currency(币种), payment_method(支付方式), user_id(用户ID)
+            
+            Returns:
+                str: 支付处理结果
+            """
+            return self._process_payment(payment_data)
+
+        @tool
+        def process_refund(refund_data: str) -> str:
+            """
+            处理退款请求
+            
+            Args:
+                refund_data: JSON格式的退款信息，包含 transaction_id(交易ID), amount(退款金额), reason(退款原因)
+            
+            Returns:
+                str: 退款处理结果
+            """
+            return self._process_refund(refund_data)
+
+        @tool
+        def check_payment_status(query_data: str) -> str:
+            """
+            查询支付状态
+            
+            Args:
+                query_data: JSON格式的查询信息，包含 transaction_id(交易ID)
+            
+            Returns:
+                str: 支付状态查询结果
+            """
+            return self._check_payment_status(query_data)
+
+        @tool
+        def validate_payment_info(payment_info: str) -> str:
+            """
+            验证支付信息
+            
+            Args:
+                payment_info: JSON格式的支付信息
+            
+            Returns:
+                str: 验证结果
+            """
+            return self._validate_payment_info(payment_info)
+
+        return [process_payment, process_refund, check_payment_status, validate_payment_info]
 
     def _create_agent(self):
         """
-        创建React代理
+        创建工具调用代理
 
         Returns:
             代理对象
         """
-        # 定义代理提示模板
-        prompt_template = """
-        你是一个专业的支付处理代理，负责处理支付和退款相关事务。
-        
-        你的职责包括：
-        1. 处理用户的支付请求
-        2. 处理退款申请
-        3. 查询交易状态
-        4. 验证支付信息的有效性
-        5. 提供支付相关的帮助和建议
-        
-        请始终保持专业、准确、安全的态度处理每一个请求。
-        对于敏感的支付信息，要格外小心处理。
-        
-        可用工具：
-        {tools}
-        
-        工具名称：{tool_names}
-        
-        请按照以下格式进行思考和行动：
-        
-        Question: 用户的输入问题
-        Thought: 我需要思考如何处理这个请求
-        Action: 选择要使用的工具
-        Action Input: 工具的输入参数
-        Observation: 工具执行的结果
-        ... (这个思考/行动/观察的过程可以重复多次)
-        Thought: 我现在知道最终答案了
-        Final Answer: 给用户的最终回复
-        
-        开始！
-        
-        Question: {input}
-        Thought: {agent_scratchpad}
-        """
+        # 使用 ChatPromptTemplate 创建现代化的提示模板
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", """你是一个专业的支付处理代理。你可以使用以下工具来处理用户的支付相关请求：
 
-        prompt = PromptTemplate.from_template(prompt_template)
+1. process_payment: 处理支付请求
+2. process_refund: 处理退款请求  
+3. check_payment_status: 查询支付状态
+4. validate_payment_info: 验证支付信息
 
-        return create_react_agent(
+请根据用户的请求选择合适的工具来处理。如果需要调用工具，请确保提供正确的JSON格式参数。
+
+支持的支付方式：{supported_payment_methods}
+支持的币种：{supported_currencies}
+最大支付金额：{max_payment_amount}
+"""),
+            ("placeholder", "{chat_history}"),
+            ("human", "{input}"),
+            ("placeholder", "{agent_scratchpad}"),
+        ])
+
+        # 使用 create_tool_calling_agent 创建工具调用代理
+        return create_tool_calling_agent(
             llm=self.llm,
             tools=self.tools,
             prompt=prompt
@@ -149,14 +169,29 @@ class PaymentAgent:
             # 解析输入参数
             payment_data = json.loads(input_str)
 
-            # 这里是支付处理的模拟逻辑
-            # 实际项目中需要调用真实的支付接口
-            required_fields = ['amount', 'currency', 'payment_method', 'user_id']
-
             # 验证必要字段
+            required_fields = ['amount', 'currency', 'payment_method', 'user_id']
             for field in required_fields:
                 if field not in payment_data:
                     return f"错误：缺少必要字段 {field}"
+
+            # 验证支付金额
+            try:
+                amount = float(payment_data['amount'])
+                if amount <= 0:
+                    return "错误：金额必须大于0"
+                if amount > self.config.MAX_PAYMENT_AMOUNT:
+                    return f"错误：金额超过单笔限额 {self.config.MAX_PAYMENT_AMOUNT}"
+            except ValueError:
+                return "错误：金额格式无效"
+
+            # 验证币种
+            if payment_data['currency'] not in self.config.SUPPORTED_CURRENCIES:
+                return f"错误：不支持的币种，支持的币种：{', '.join(self.config.SUPPORTED_CURRENCIES)}"
+
+            # 验证支付方式
+            if payment_data['payment_method'] not in self.config.SUPPORTED_PAYMENT_METHODS:
+                return f"错误：不支持的支付方式，支持的方式：{', '.join(self.config.SUPPORTED_PAYMENT_METHODS)}"
 
             # 模拟支付处理
             transaction_id = f"TXN_{payment_data['user_id']}_{hash(str(payment_data)) % 100000}"
@@ -166,7 +201,9 @@ class PaymentAgent:
                 "transaction_id": transaction_id,
                 "amount": payment_data['amount'],
                 "currency": payment_data['currency'],
-                "message": "支付处理成功"
+                "payment_method": payment_data['payment_method'],
+                "message": "支付处理成功",
+                "created_time": "2024-01-15 10:30:00"
             }
 
             self.logger.info(f"支付处理完成: {transaction_id}")
@@ -197,6 +234,14 @@ class PaymentAgent:
                 if field not in refund_data:
                     return f"错误：缺少必要字段 {field}"
 
+            # 验证退款金额
+            try:
+                amount = float(refund_data['amount'])
+                if amount <= 0:
+                    return "错误：退款金额必须大于0"
+            except ValueError:
+                return "错误：退款金额格式无效"
+
             # 模拟退款处理
             refund_id = f"REF_{refund_data['transaction_id']}_{hash(str(refund_data)) % 100000}"
 
@@ -206,7 +251,8 @@ class PaymentAgent:
                 "original_transaction_id": refund_data['transaction_id'],
                 "refund_amount": refund_data['amount'],
                 "reason": refund_data['reason'],
-                "message": "退款处理成功，预计3-5个工作日到账"
+                "message": "退款处理成功，预计3-5个工作日到账",
+                "created_time": "2024-01-15 10:30:00"
             }
 
             self.logger.info(f"退款处理完成: {refund_id}")
@@ -234,17 +280,18 @@ class PaymentAgent:
             if 'transaction_id' not in query_data:
                 return "错误：缺少交易ID"
 
-            # 模拟状态查询
-            # 实际项目中需要查询数据库或调用支付服务商API
             transaction_id = query_data['transaction_id']
 
+            # 模拟状态查询
             result = {
                 "transaction_id": transaction_id,
                 "status": "completed",  # completed, pending, failed, refunded
                 "amount": "100.00",
                 "currency": "CNY",
+                "payment_method": "alipay",
                 "created_time": "2024-01-15 10:30:00",
-                "completed_time": "2024-01-15 10:30:15"
+                "completed_time": "2024-01-15 10:30:15",
+                "message": "支付已完成"
             }
 
             return json.dumps(result, ensure_ascii=False)
@@ -267,7 +314,6 @@ class PaymentAgent:
         """
         try:
             payment_data = json.loads(input_str)
-
             validation_errors = []
 
             # 验证金额
@@ -276,33 +322,26 @@ class PaymentAgent:
                     amount = float(payment_data['amount'])
                     if amount <= 0:
                         validation_errors.append("金额必须大于0")
-                    if amount > 10000:  # 假设单笔限额10000
-                        validation_errors.append("金额超过单笔限额")
+                    if amount > self.config.MAX_PAYMENT_AMOUNT:
+                        validation_errors.append(f"金额超过单笔限额 {self.config.MAX_PAYMENT_AMOUNT}")
                 except ValueError:
                     validation_errors.append("金额格式无效")
 
             # 验证币种
-            supported_currencies = ['CNY', 'USD', 'EUR']
             if 'currency' in payment_data:
-                if payment_data['currency'] not in supported_currencies:
-                    validation_errors.append(f"不支持的币种，支持的币种：{', '.join(supported_currencies)}")
+                if payment_data['currency'] not in self.config.SUPPORTED_CURRENCIES:
+                    validation_errors.append(f"不支持的币种，支持的币种：{', '.join(self.config.SUPPORTED_CURRENCIES)}")
 
             # 验证支付方式
-            supported_methods = ['alipay', 'wechat', 'bank_card', 'paypal']
             if 'payment_method' in payment_data:
-                if payment_data['payment_method'] not in supported_methods:
-                    validation_errors.append(f"不支持的支付方式，支持的方式：{', '.join(supported_methods)}")
+                if payment_data['payment_method'] not in self.config.SUPPORTED_PAYMENT_METHODS:
+                    validation_errors.append(f"不支持的支付方式，支持的方式：{', '.join(self.config.SUPPORTED_PAYMENT_METHODS)}")
 
-            if validation_errors:
-                result = {
-                    "valid": False,
-                    "errors": validation_errors
-                }
-            else:
-                result = {
-                    "valid": True,
-                    "message": "支付信息验证通过"
-                }
+            result = {
+                "valid": len(validation_errors) == 0,
+                "errors": validation_errors if validation_errors else None,
+                "message": "支付信息验证通过" if len(validation_errors) == 0 else "支付信息验证失败"
+            }
 
             return json.dumps(result, ensure_ascii=False)
 
@@ -322,8 +361,18 @@ class PaymentAgent:
             str: 代理的响应结果
         """
         try:
-            result = self.agent_executor.invoke({"input": user_input})
+            # 构建输入参数
+            input_data = {
+                "input": user_input,
+                "supported_payment_methods": ", ".join(self.config.SUPPORTED_PAYMENT_METHODS),
+                "supported_currencies": ", ".join(self.config.SUPPORTED_CURRENCIES),
+                "max_payment_amount": self.config.MAX_PAYMENT_AMOUNT
+            }
+
+            # 使用代理处理请求
+            result = self.agent_executor.invoke(input_data)
             return result.get("output", "抱歉，无法处理您的请求")
+
         except Exception as e:
             self.logger.error(f"请求处理失败: {str(e)}")
             return f"处理请求时发生错误: {str(e)}"
@@ -335,7 +384,7 @@ class PaymentAgent:
         Returns:
             str: 帮助信息
         """
-        help_text = """
+        help_text = f"""
         支付代理帮助信息：
         
         支持的功能：
@@ -346,10 +395,35 @@ class PaymentAgent:
         
         示例用法：
         - "我要支付100元，使用支付宝"
-        - "我要退款，交易ID是TXN_12345"
+        - "我要退款，交易ID是TXN_12345，原因是商品有质量问题"
         - "查询交易TXN_12345的状态"
+        - "验证这个支付信息：金额150元，币种CNY，支付方式微信"
         
-        支持的支付方式：支付宝、微信、银行卡、PayPal
-        支持的币种：人民币(CNY)、美元(USD)、欧元(EUR)
+        支持的支付方式：{', '.join(self.config.SUPPORTED_PAYMENT_METHODS)}
+        支持的币种：{', '.join(self.config.SUPPORTED_CURRENCIES)}
+        最大支付金额：{self.config.MAX_PAYMENT_AMOUNT}
         """
         return help_text
+
+    def test_simple_chat(self, message: str) -> str:
+        """
+        测试简单的聊天功能
+
+        Args:
+            message: 测试消息
+
+        Returns:
+            str: 模型回复
+        """
+        try:
+            messages = [
+                SystemMessage(content="你是一个专业的支付助手。"),
+                HumanMessage(content=message)
+            ]
+            
+            response = self.llm.invoke(messages)
+            return response.content
+            
+        except Exception as e:
+            self.logger.error(f"测试聊天失败: {str(e)}")
+            return f"测试聊天失败: {str(e)}"
