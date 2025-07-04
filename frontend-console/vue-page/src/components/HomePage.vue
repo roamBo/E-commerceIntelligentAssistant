@@ -1,4 +1,4 @@
-qq<template>
+<template>
   <div class="home-container">
     <!-- 主标语区域 -->
     <div class="hero-section">
@@ -14,23 +14,25 @@ qq<template>
         <h1 class="main-heading">让你的购物体验更上一层楼</h1>
       </div>
       
-      <!-- 三大优势 -->
-      <div class="advantages">
-        <div class="advantage-item">
+      <!-- 三大优势 - 修改为灵动布局 -->
+      <div class="advantages-container">
+        <div class="advantage-item advantage-item-1">
           <div class="advantage-icon">
-            <span class="emoji-icon">⚙️</span>
+            <div class="gear-wrapper">
+              <span class="emoji-icon">⚙️</span>
+            </div>
           </div>
           <h4>智能化处理</h4>
           <p>超快上手</p>
         </div>
-        <div class="advantage-item">
+        <div class="advantage-item advantage-item-2">
           <div class="advantage-icon">
             <span class="emoji-icon">📊</span>
           </div>
           <h4>数据分析</h4>
           <p>全新体验</p>
         </div>
-        <div class="advantage-item">
+        <div class="advantage-item advantage-item-3">
           <div class="advantage-icon">
             <span class="emoji-icon">🤖</span>
           </div>
@@ -863,44 +865,21 @@ html, body {
   border-radius: 2px;
 }
 
-.advantages {
-  display: flex;
-  justify-content: center;
-  gap: 40px;
-  margin-top: 40px; /* 从60px减少到40px */
+/* 新的优势圆圈布局样式 */
+.advantages-container {
+  position: relative;
+  width: 100%;
+  height: 350px; /* 增加高度以适应上移的元素 */
+  margin-top: 60px; /* 增加顶部边距 */
 }
 
 .advantage-item {
+  position: absolute;
   text-align: center;
-  padding: 20px;
   opacity: 0;
-  transform: translateY(20px);
-  animation: fadeInUp 0.7s ease forwards;
-}
-.advantage-item:nth-child(1) {
-  animation-delay: 0.1s;
-}
-.advantage-item:nth-child(2) {
-  animation-delay: 0.4s;
-}
-.advantage-item:nth-child(3) {
-  animation-delay: 0.7s;
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .advantage-icon {
-  width: 80px;
-  height: 80px;
   border-radius: 50%;
   background: #fff;
   display: flex;
@@ -909,6 +888,78 @@ html, body {
   margin: 0 auto 20px;
   box-shadow: 0 10px 20px rgba(0,0,0,0.05);
   position: relative;
+}
+
+.advantage-item-1 {
+  right: 65%;
+  top: 10%;
+  animation: fadeInAdvantage1 0.7s ease forwards, floatItem1 6s ease-in-out infinite alternate;
+  animation-delay: 0.1s, 0.8s;
+}
+
+.advantage-item-2 {
+  right: 15%;
+  top: -30%;
+  animation: fadeInAdvantage2 0.7s ease forwards, floatItem2 7s ease-in-out infinite alternate;
+  animation-delay: 0.4s, 1.1s;
+}
+
+.advantage-item-3 {
+  right: 40%;
+  top: 35%;
+  animation: fadeInAdvantage3 0.7s ease forwards, floatItem3 5s ease-in-out infinite alternate;
+  animation-delay: 0.7s, 1.4s;
+}
+
+@keyframes fadeInAdvantage1 {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes fadeInAdvantage2 {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes fadeInAdvantage3 {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 不同大小的圆圈 - 放大尺寸 */
+.advantage-item-1 .advantage-icon {
+  width: 140px;
+  height: 140px;
+  position: relative;
+  z-index: 1;
+}
+
+.advantage-item-2 .advantage-icon {
+  width: 130px;
+  height: 130px;
+}
+
+.advantage-item-3 .advantage-icon {
+  width: 100px;
+  height: 100px;
 }
 
 .advantage-icon::before {
@@ -923,22 +974,34 @@ html, body {
 }
 
 .advantage-icon .emoji-icon {
-  font-size: 38px;
   line-height: 1;
 }
 
-/* 添加 emoji 動態效果 */
-.advantage-item:nth-child(1) .emoji-icon {
-  animation: gearRotate 4s linear infinite;
+/* 不同大小的emoji图标 - 放大尺寸 */
+.advantage-item-1 .emoji-icon {
+  font-size: 82px;
   display: inline-block;
+  position: relative;
+  z-index: 2;
 }
 
-.advantage-item:nth-child(2) .emoji-icon {
+.gear-wrapper {
+  animation: gearRotate 4s linear infinite;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.advantage-item-2 .emoji-icon {
+  font-size: 62px;
   animation: dataJump 2s ease-in-out infinite;
   display: inline-block;
 }
 
-.advantage-item:nth-child(3) .emoji-icon {
+.advantage-item-3 .emoji-icon {
+  font-size: 45px;
   animation: robotBounce 1.5s ease infinite;
   display: inline-block;
 }
@@ -954,10 +1017,10 @@ html, body {
 
 @keyframes dataJump {
   0%, 100% {
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
   50% {
-    transform: translateY(-5px);
+    transform: translateY(-5px) scale(1.04);
   }
 }
 
@@ -966,7 +1029,34 @@ html, body {
     transform: translateY(0) scale(1);
   }
   50% {
-    transform: translateY(-5px) scale(1.03);
+    transform: translateY(-5px) scale(1.05);
+  }
+}
+
+@keyframes floatItem1 {
+  0%, 100% {
+    transform: translateY(0) translateX(0);
+  }
+  50% {
+    transform: translateY(-25px) translateX(15px);
+  }
+}
+
+@keyframes floatItem2 {
+  0%, 100% {
+    transform: translateY(0) translateX(0);
+  }
+  50% {
+    transform: translateY(25px) translateX(-15px);
+  }
+}
+
+@keyframes floatItem3 {
+  0%, 100% {
+    transform: translateY(0) translateX(0) scale(1);
+  }
+  50% {
+    transform: translateY(-30px) translateX(-20px) scale(1.05);
   }
 }
 
@@ -979,6 +1069,63 @@ html, body {
 .advantage-item p {
   color: #666;
   font-size: 16px;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .advantages-container {
+    height: 500px;
+    position: relative;
+    margin-top: 70px;
+  }
+  
+  .advantage-item-1 {
+    right: auto;
+    left: 5%;
+    top: 0;
+  }
+  
+  .advantage-item-2 {
+    right: 5%;
+    top: -10%;
+  }
+  
+  .advantage-item-3 {
+    right: auto;
+    left: 35%;
+    top: 60%;
+  }
+  
+  .advantage-item-1 .advantage-icon {
+    width: 110px;
+    height: 110px;
+  }
+  
+  .advantage-item-2 .advantage-icon {
+    width: 100px;
+    height: 100px;
+  }
+  
+  .advantage-item-3 .advantage-icon {
+    width: 85px;
+    height: 85px;
+  }
+  
+  .advantage-item-1 .emoji-icon {
+    font-size: 54px; /* 移动端齿轮emoji尺寸 */
+  }
+  
+  .advantage-item-2 .emoji-icon {
+    font-size: 42px;
+  }
+  
+  .advantage-item-3 .emoji-icon {
+    font-size: 34px;
+  }
+  
+  .hero-section {
+    min-height: 110vh; /* 移动端增加高度以容纳新布局 */
+  }
 }
 
 @media (max-width: 1200px) {
