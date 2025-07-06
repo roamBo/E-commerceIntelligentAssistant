@@ -80,7 +80,104 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public List<Product> searchProductsByName(String name) {
-        return productRepository.findByNameContaining(name);
+//        return productRepository.findByNameContaining(name);
+//        try {
+//            // 首先尝试使用分析器搜索
+//            List<Product> results = productRepository.searchByNameWithAnalyzer(name);
+//
+//            // 如果结果为空，尝试模糊搜索
+//            if (results.isEmpty()) {
+//                results = productRepository.searchByNameWildcard(name);
+//            }
+//
+//            // 如果还是为空，尝试多字段搜索
+//            if (results.isEmpty()) {
+//                results = productRepository.searchByMultipleFields(name);
+//            }
+//
+//            // 如果还是为空，使用原始的containing方法作为最后的备选
+//            if (results.isEmpty()) {
+//                results = productRepository.findByNameContaining(name);
+//            }
+//
+//            System.out.println("搜索关键词: " + name + ", 找到 " + results.size() + " 个结果");
+//            results.forEach(product ->
+//                    System.out.println("  - " + product.getName() + " (¥" + product.getPrice() + ")")
+//            );
+//
+//            return results;
+//        } catch (Exception e) {
+//            System.err.println("搜索商品失败: " + e.getMessage());
+//            e.printStackTrace();
+//            // 返回空列表而不是抛出异常
+//            return new ArrayList<>();
+//        }
+        try {
+            System.out.println("=== 开始搜索商品，关键词: " + name + " ===");
+
+            // 首先尝试使用分析器搜索
+            System.out.println("1. 尝试使用分析器搜索...");
+            List<Product> results = productRepository.searchByNameWithAnalyzer(name);
+            System.out.println("   分析器搜索结果数量: " + results.size());
+
+            // 如果结果为空，尝试模糊搜索
+            if (results.isEmpty()) {
+                System.out.println("2. 尝试模糊搜索...");
+                results = productRepository.searchByNameWildcard(name);
+                System.out.println("   模糊搜索结果数量: " + results.size());
+            }
+
+            // 如果还是为空，尝试多字段搜索
+            if (results.isEmpty()) {
+                System.out.println("3. 尝试多字段搜索...");
+                results = productRepository.searchByMultipleFields(name);
+                System.out.println("   多字段搜索结果数量: " + results.size());
+            }
+
+            // 如果还是为空，使用原始的containing方法作为最后的备选
+            if (results.isEmpty()) {
+                System.out.println("4. 尝试原始containing搜索...");
+                results = productRepository.findByNameContaining(name);
+                System.out.println("   containing搜索结果数量: " + results.size());
+            }
+
+            // 如果还是为空，尝试直接查询所有商品并在内存中过滤
+            if (results.isEmpty()) {
+                System.out.println("5. 尝试内存中过滤...");
+                List<Product> allProducts = getAllProducts();
+                results = allProducts.stream()
+                        .filter(product -> product.getName() != null &&
+                                product.getName().toLowerCase().contains(name.toLowerCase()))
+                        .collect(Collectors.toList());
+                System.out.println("   内存过滤结果数量: " + results.size());
+            }
+
+            System.out.println("=== 搜索完成，关键词: " + name + ", 找到 " + results.size() + " 个结果 ===");
+            results.forEach(product ->
+                    System.out.println("  - " + product.getName() + " (¥" + product.getPrice() + ")")
+            );
+
+            return results;
+        } catch (Exception e) {
+            System.err.println("搜索商品失败: " + e.getMessage());
+            System.err.println("错误类型: " + e.getClass().getSimpleName());
+            e.printStackTrace();
+
+            // 尝试从内存中搜索作为最后的备选方案
+            try {
+                System.out.println("尝试从内存中搜索作为备选方案...");
+                List<Product> allProducts = getAllProducts();
+                List<Product> fallbackResults = allProducts.stream()
+                        .filter(product -> product.getName() != null &&
+                                product.getName().toLowerCase().contains(name.toLowerCase()))
+                        .collect(Collectors.toList());
+                System.out.println("内存搜索备选方案找到 " + fallbackResults.size() + " 个结果");
+                return fallbackResults;
+            } catch (Exception ex) {
+                System.err.println("内存搜索备选方案也失败: " + ex.getMessage());
+                return new ArrayList<>();
+            }
+        }
     }
 
     @Override
@@ -196,14 +293,17 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public List<Product> getLatestProducts(int limit) {
         try {
-            // 修复：使用分页查询替代类型转换
-            Pageable pageable = PageRequest.of(0, Integer.MAX_VALUE, Sort.by(Sort.Direction.DESC, "createTime"));
-            return productRepository.findAll(pageable).getContent()
-                    .stream()
+            // 使用JPA方式获取最新商品
+            Iterable<Product> products = productRepository.findAll();
+            List<Product> allProducts = StreamSupport.stream(products.spliterator(), false)
+                    .collect(Collectors.toList());
+            return allProducts.stream()
+                    .sorted((p1, p2) -> p2.getCreateTime().compareTo(p1.getCreateTime()))
                     .limit(limit)
                     .collect(Collectors.toList());
         } catch (Exception e) {
             System.err.println("获取最新商品失败: " + e.getMessage());
+            e.printStackTrace();
             return new ArrayList<>();
         }
     }
