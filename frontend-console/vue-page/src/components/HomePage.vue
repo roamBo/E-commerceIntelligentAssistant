@@ -1386,40 +1386,4 @@ html, body {
     transform: translateY(-5px) translateX(-50%);
   }
 }
-
-.advantage-icon, .advantage-item-1 .gear-wrapper {
-  background: #fff !important;
-  box-shadow: 0 10px 20px rgba(0,0,0,0.05);
-}
-
-.advantage-item-1 .gear-wrapper {
-  background: #fff !important;
-  border-radius: 50%;
-}
-
-.advantage-item-1 .advantage-icon {
-  background: #fff !important;
-  border-radius: 50%;
-}
-
-.advantage-item-1 .advantage-icon::before {
-  background: rgba(64, 158, 255, 0.05);
-}
-
-.advantage-item-1 .advantage-icon,
-.advantage-item-1 .gear-wrapper {
-  background: #fff !important;
-}
-
-.advantage-item-1 .advantage-icon {
-  background: #fff !important;
-}
-
-.advantage-item-1 .gear-wrapper {
-  background: #fff !important;
-}
-
-.advantage-item-1 .emoji-icon {
-  background: transparent !important;
-}
-</style> 
+</style>

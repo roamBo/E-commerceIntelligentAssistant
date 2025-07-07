@@ -166,6 +166,7 @@
 import { ref, computed, onMounted, reactive } from 'vue'
 import orderService from '../services/orderService'
 import orderModel from '../services/orderModel'
+import { ElMessage } from 'element-plus'
 
 const searchKeyword = ref('')
 const orderStatus = ref('all')
@@ -286,6 +287,9 @@ const fetchOrders = async () => {
   loading.value = true
   try {
     orders.value = await orderService.getOrders()
+    ElMessage.success({ message: '订单数据读取成功', duration: 1000 })
+  } catch (e) {
+    ElMessage.error({ message: '订单数据读取失败', duration: 1000 })
   } finally {
     loading.value = false
   }
@@ -597,4 +601,4 @@ const getTotalAmount = (order) => {
   color: #f56c6c;
   font-weight: bold;
 }
-</style> 
+</style>

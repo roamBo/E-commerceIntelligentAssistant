@@ -1,4 +1,4 @@
-import { orderApi, transformOrderData, getMockOrderData } from './api';
+import { orderApi, transformOrderData } from './api';
 import orderModel from './orderModel';
 
 /**
@@ -12,10 +12,16 @@ export const orderService = {
   getOrders: async () => {
     try {
       const data = await orderApi.getOrders();
-      return transformOrderData(data);
+      // 适配后端数据结构，防止字段不符导致报错
+      return Array.isArray(data)
+        ? data.map(order => orderModel.createOrderModel(order))
+        : [orderModel.createOrderModel(data)];
     } catch (error) {
       console.error('获取订单列表失败:', error);
-      return getMockOrderData();
+      if (error && error.stack) {
+        console.error('详细堆栈:', error.stack);
+      }
+      throw error;
     }
   },
 
@@ -45,9 +51,7 @@ export const orderService = {
       return orderModel.createOrderModel(data);
     } catch (error) {
       console.error(`获取订单 ${orderId} 详情失败:`, error);
-      // 返回模拟数据中符合ID的订单，如果没有则返回第一个
-      const mockOrders = getMockOrderData();
-      return mockOrders.find(order => order.id === orderId) || mockOrders[0];
+      throw error; // 不再返回 mock 数据
     }
   },
 
@@ -169,4 +173,4 @@ export const orderService = {
   }
 };
 
-export default orderService; 
+export default orderService;

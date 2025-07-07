@@ -78,12 +78,12 @@ const activeIndex = ref(null)
 
 const menuItems = [
   {
-    index: 'order',
-    label: '订单智能管家'
-  },
-  {
     index: 'guide',
     label: '个性化导购助手'
+  },
+  {
+    index: 'order',
+    label: '订单智能管家'
   },
   {
     index: 'payment',
