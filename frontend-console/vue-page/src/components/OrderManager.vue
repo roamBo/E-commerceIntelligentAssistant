@@ -10,7 +10,6 @@
           clearable
         />
         <el-button type="primary" class="search-btn">搜索</el-button>
-        <el-button type="success" @click="showCreateOrderDialog">创建订单</el-button>
       </div>
     </div>
 
