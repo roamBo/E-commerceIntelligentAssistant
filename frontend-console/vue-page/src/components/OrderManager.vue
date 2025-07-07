@@ -17,10 +17,10 @@
     <div class="filter-bar">
       <el-radio-group v-model="orderStatus" size="medium">
         <el-radio-button label="all">全部订单</el-radio-button>
-        <el-radio-button label="pending">待付款</el-radio-button>
-        <el-radio-button label="processing">处理中</el-radio-button>
-        <el-radio-button label="shipped">已发货</el-radio-button>
-        <el-radio-button label="completed">已完成</el-radio-button>
+        <el-radio-button label="PENDING_PAYMENT">待付款</el-radio-button>
+        <el-radio-button label="PAID">处理中</el-radio-button>
+        <el-radio-button label="DELIVERED">已发货</el-radio-button>
+        <el-radio-button label="FINISH">已完成</el-radio-button>
       </el-radio-group>
       
       <div class="date-filter">
@@ -82,7 +82,7 @@
         <div class="order-bottom">
           <div class="order-logistics">
             <i class="el-icon-truck"></i>
-            <span>物流状态: {{ order.logistics.status }}</span>
+            <span>物流状态: {{ getStatusText(order.status) }}</span>
             <span class="logistics-company">{{ order.logistics.company }}</span>
             <span class="logistics-number">运单号: {{ order.logistics.trackingNumber }}</span>
           </div>
@@ -91,8 +91,8 @@
             <span class="amount">合计: <strong>¥{{ getTotalAmount(order).toFixed(2) }}</strong></span>
           </div>
           <div class="order-actions">
-            <el-button size="small" v-if="order.status === 'pending'">付款</el-button>
-            <el-button size="small" v-if="order.status === 'shipped'">确认收货</el-button>
+            <el-button size="small" v-if="order.status === 'PENDING_PAYMENT'">付款</el-button>
+            <el-button size="small" v-if="order.status === 'DELIVERED'">确认收货</el-button>
             <el-button size="small" type="info" plain>查看详情</el-button>
           </div>
         </div>
@@ -319,12 +319,34 @@ const filteredOrders = computed(() => {
 
 // 获取订单状态对应的Tag类型
 const getStatusType = (status) => {
-  return orderService.getStatusType(status)
+  switch (status) {
+    case 'PENDING_PAYMENT':
+      return 'info'
+    case 'PAID':
+      return 'warning'
+    case 'DELIVERED':
+      return 'success'
+    case 'FINISH':
+      return 'success'
+    default:
+      return 'info'
+  }
 }
 
 // 获取订单状态的中文描述
 const getStatusText = (status) => {
-  return orderService.getStatusText(status)
+  switch (status) {
+    case 'PENDING_PAYMENT':
+      return '待付款'
+    case 'PAID':
+      return '处理中'
+    case 'DELIVERED':
+      return '已发货'
+    case 'FINISH':
+      return '已完成'
+    default:
+      return status
+  }
 }
 
 // 计算订单商品总数

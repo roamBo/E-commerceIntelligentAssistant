@@ -78,7 +78,7 @@ export const orderService = {
    * @returns {Array} 过滤后的订单列表
    */
   filterOrdersByStatus: (orders, status) => {
-    if (!status || status === 'all') return orders;
+    if (status === 'all') return orders;
     return orders.filter(order => order.status === status);
   },
 
@@ -148,13 +148,18 @@ export const orderService = {
    * @returns {string} 标签类型
    */
   getStatusType: (status) => {
-    const types = {
-      pending: 'warning',
-      processing: 'info',
-      shipped: 'primary',
-      completed: 'success'
-    };
-    return types[status] || 'info';
+    switch (status) {
+      case 'PENDING_PAYMENT':
+        return 'warning';
+      case 'PAID':
+        return 'info';
+      case 'DELIVERED':
+        return 'primary';
+      case 'FINISH':
+        return 'success';
+      default:
+        return 'default';
+    }
   },
 
   /**
@@ -163,13 +168,18 @@ export const orderService = {
    * @returns {string} 中文描述
    */
   getStatusText: (status) => {
-    const texts = {
-      pending: '待付款',
-      processing: '处理中',
-      shipped: '已发货',
-      completed: '已完成'
-    };
-    return texts[status] || status;
+    switch (status) {
+      case 'PENDING_PAYMENT':
+        return '待付款';
+      case 'PAID':
+        return '处理中';
+      case 'DELIVERED':
+        return '已发货';
+      case 'FINISH':
+        return '已完成';
+      default:
+        return status;
+    }
   }
 };
 

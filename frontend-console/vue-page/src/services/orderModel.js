@@ -9,25 +9,16 @@
  * @returns {Object} 订单对象
  */
 export const createOrderModel = (data = {}) => {
-  // 后端状态到前端状态的映射
-  const statusMap = {
-    PENDING_PAYMENT: 'pending',
-    PROCESSING: 'processing',
-    SHIPPED: 'shipped',
-    COMPLETED: 'completed',
-    // 可根据后端实际枚举继续补充
-  };
-  // 适配时间格式
+  // 直接保留後端狀態
   let date = data.orderTime || data.date || new Date().toLocaleString();
   if (typeof date === 'string' && date.includes('T')) {
-    // ISO格式转本地字符串
     date = date.replace('T', ' ').split('.')[0];
   }
   return {
     id: data.orderId || data.id || `ORD-${Math.floor(Math.random() * 10000)}`,
     userId: data.userId || 0,
     date,
-    status: statusMap[data.status] || data.status || 'pending',
+    status: data.status || 'PENDING_PAYMENT',
     products: (data.items || data.products || []).map(item => createProductModel(item)),
     logistics: createLogisticsModel(data.logistics),
     shippingAddress: data.shippingAddress || '',
