@@ -9,7 +9,7 @@
           prefix-icon="el-icon-search"
           clearable
         />
-        <el-button type="primary" class="search-btn">搜索</el-button>
+        <el-button type="primary" class="search-btn" @click="handleSearch">搜索</el-button>
       </div>
     </div>
 
@@ -168,6 +168,7 @@ import orderModel from '../services/orderModel'
 import { ElMessage } from 'element-plus'
 
 const searchKeyword = ref('')
+const searchActionKeyword = ref('')
 const orderStatus = ref('all')
 const dateRange = ref([])
 const loading = ref(false)
@@ -301,18 +302,11 @@ onMounted(() => {
 
 // 根据筛选条件过滤订单
 const filteredOrders = computed(() => {
-  // 使用 orderService 的方法进行过滤
   let result = orders.value
-  
-  // 根据订单状态过滤
   result = orderService.filterOrdersByStatus(result, orderStatus.value)
-  
-  // 根据关键词搜索
-  result = orderService.searchOrders(result, searchKeyword.value)
-  
-  // 根据日期范围过滤
+  // 用searchActionKeyword进行搜索
+  result = orderService.searchOrders(result, searchActionKeyword.value)
   result = orderService.filterOrdersByDateRange(result, dateRange.value)
-  
   return result
 })
 
@@ -356,6 +350,11 @@ const getTotalQuantity = (order) => {
 // 计算订单总金额
 const getTotalAmount = (order) => {
   return orderService.calculateTotalAmount(order)
+}
+
+// 搜索按钮点击事件
+const handleSearch = () => {
+  searchActionKeyword.value = searchKeyword.value
 }
 </script>
 
