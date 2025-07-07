@@ -4,7 +4,6 @@
     <modules>
       <module fileurl="file://$PROJECT_DIR$/E-commerceIntelligentAssistant.iml" filepath="$PROJECT_DIR$/E-commerceIntelligentAssistant.iml" />
       <module fileurl="file://$PROJECT_DIR$/frontend-console/frontend-console.iml" filepath="$PROJECT_DIR$/frontend-console/frontend-console.iml" />
-      <module fileurl="file://$PROJECT_DIR$/java-services/payment-service/payment-service.iml" filepath="$PROJECT_DIR$/java-services/payment-service/payment-service.iml" />
     </modules>
   </component>
 </project>

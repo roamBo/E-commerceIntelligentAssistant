@@ -1,0 +1,31 @@
+# 测试环境配置
+server:
+  port: 0  # 随机端口，避免端口冲突
+
+spring:
+  application:
+    name: product-service-test
+  cloud:
+    nacos:
+      discovery:
+        enabled: false  # 测试时禁用服务注册
+  elasticsearch:
+    uris: http://localhost:9200
+    connection-timeout: 10s
+    socket-timeout: 10s
+    username: elastic
+    password: changeme
+
+logging:
+  level:
+    org.springframework.data.elasticsearch: DEBUG
+    org.randombo.productservice: DEBUG
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
+# 测试数据配置
+test:
+  data:
+    enabled: true
+    products:
+      count: 5  # 测试时只创建5个商品 
