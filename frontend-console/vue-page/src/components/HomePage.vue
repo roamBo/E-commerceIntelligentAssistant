@@ -948,8 +948,6 @@ html, body {
 .advantage-item-1 .advantage-icon {
   width: 140px;
   height: 140px;
-  position: relative;
-  z-index: 1;
 }
 
 .advantage-item-2 .advantage-icon {

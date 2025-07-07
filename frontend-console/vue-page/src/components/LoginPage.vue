@@ -33,6 +33,21 @@ const loginForm = ref(null)
 
 const emit = defineEmits(['login', 'register', 'forgot'])
 
+// 數據庫連接資訊（僅示意，實際連接請在後端進行）
+// 連接地址: mysql2.sqlpub.com:3307
+// 數據庫用戶: login_user
+// 數據庫名稱: login_user
+// 例如（Node.js後端可用）：
+// const mysql = require('mysql2');
+// const connection = mysql.createConnection({
+//   host: 'mysql2.sqlpub.com',
+//   port: 3307,
+//   user: 'login_user',
+//   password: '你的密碼',
+//   database: 'login_user'
+// });
+// connection.connect();
+
 const onLogin = () => {
   loginForm.value.validate(valid => {
     if (valid) {
