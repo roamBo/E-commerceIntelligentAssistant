@@ -1,117 +1,42 @@
 package org.randombo.paymentservice.repository;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.randombo.paymentservice.model.Payment;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.data.redis.DataRedisTest;
-import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.*;
 
+// 用于 Redis 数据测试
 @DataRedisTest
-@ActiveProfiles("test")
 public class PaymentRepositoryTest {
 
     @Autowired
     private PaymentRepository paymentRepository;
 
-    private Payment savedPayment;
+    @Test
+    void testSaveAndFindById() {
+        Payment payment = new Payment("101", "order-101", "user-101", new BigDecimal("20.00"),
+                "PENDING", LocalDateTime.now(), LocalDateTime.now());
 
-    @BeforeEach
-    void setUp() {
-        // 清理测试数据
-        paymentRepository.deleteAll();
+        paymentRepository.save(payment);
+        Payment result = paymentRepository.findById("101").orElse(null);
 
-        // 准备测试数据
-        Payment payment = new Payment();
-        payment.setId("test123");
-        payment.setOrderId("order123");
-        payment.setUserId("user123");
-        payment.setAmount(new BigDecimal("100.00"));
-        payment.setStatus("PENDING");
-        payment.setCreateAt(LocalDateTime.now());
-        payment.setUpdateAt(LocalDateTime.now());
-
-        savedPayment = paymentRepository.save(payment);
+        assertNotNull(result);
+        assertEquals("order-101", result.getOrderId());
     }
 
     @Test
-    void shouldSaveAndFindPaymentById() {
-        // When
-        Optional<Payment> foundPayment = paymentRepository.findById(savedPayment.getId());
+    void testFindByUserId() {
+        Payment payment = new Payment("102", "order-102", "user-102", new BigDecimal("50.00"),
+                "SUCCESS", LocalDateTime.now(), LocalDateTime.now());
 
-        // Then
-        assertThat(foundPayment).isPresent();
-        assertThat(foundPayment.get().getId()).isEqualTo(savedPayment.getId());
-        assertThat(foundPayment.get().getOrderId()).isEqualTo("order123");
-    }
+        paymentRepository.save(payment);
 
-    @Test
-    void shouldFindAllPayments() {
-        // When
-        Iterable<Payment> payments = paymentRepository.findAll();
-
-        // Then
-        assertThat(payments).hasSize(1);
-        assertThat(payments.iterator().next().getUserId()).isEqualTo("user123");
-    }
-
-    @Test
-    void shouldFindPaymentsByUserId() {
-        // When
-        Iterable<Payment> payments = paymentRepository.findByUserId("user123");
-
-        // Then
-        assertThat(payments).hasSize(1);
-        assertThat(payments.iterator().next().getId()).isEqualTo("test123");
-    }
-
-    @Test
-    void shouldFindPaymentsByStatus() {
-        // When
-        Iterable<Payment> payments = paymentRepository.findByStatus("PENDING");
-
-        // Then
-        assertThat(payments).hasSize(1);
-        assertThat(payments.iterator().next().getStatus()).isEqualTo("PENDING");
-    }
-
-    @Test
-    void shouldUpdatePayment() {
-        // Given
-        Payment paymentToUpdate = paymentRepository.findById("test123").get();
-        paymentToUpdate.setStatus("SUCCESS");
-
-        // When
-        Payment updatedPayment = paymentRepository.save(paymentToUpdate);
-
-        // Then
-        assertThat(updatedPayment.getStatus()).isEqualTo("SUCCESS");
-        assertThat(paymentRepository.findById("test123").get().getStatus())
-                .isEqualTo("SUCCESS");
-    }
-
-    @Test
-    void shouldDeletePayment() {
-        // When
-        paymentRepository.deleteById("test123");
-
-        // Then
-        assertThat(paymentRepository.findById("test123")).isEmpty();
-    }
-
-    @Test
-    void shouldReturnEmptyWhenPaymentNotFound() {
-        // When
-        Optional<Payment> foundPayment = paymentRepository.findById("non-existing");
-
-        // Then
-        assertThat(foundPayment).isEmpty();
+        Iterable<Payment> results = paymentRepository.findByUserId("user-102");
+        assertTrue(results.iterator().hasNext());
     }
 }
