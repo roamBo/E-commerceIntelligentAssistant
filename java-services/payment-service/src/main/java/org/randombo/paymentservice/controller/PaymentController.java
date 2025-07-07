@@ -66,4 +66,12 @@ public class PaymentController {
         paymentService.deletePayment(id);
         return ResponseEntity.noContent().build();
     }
+
+    @PostMapping("/alipay")
+    public ResponseEntity<String> createAlipayOrder(@RequestParam String outTradeNo, @RequestParam String totalAmount, @RequestParam String subject) {
+        String result = paymentService.createAlipayOrder(outTradeNo, totalAmount, subject);
+        return result != null ?
+                ResponseEntity.ok(result) :
+                ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
 }
