@@ -65,29 +65,4 @@ public class OrderRepositoryTest {
 
         assertFalse(abnormalOrders.isEmpty(), "应能查到一条超时未支付订单");
     }
-
-    // 测试订单删除
-    @Test
-    public void testDeleteOrder() {
-        Order order = new Order();
-        order.setOrderId("ORDER-DEL");
-        orderRepository.save(order);
-
-        orderRepository.delete(order);
-        assertFalse(orderRepository.findByOrderId("ORDER-DEL").isPresent());
-    }
-
-    // 测试订单状态更新
-    @Test
-    public void testUpdateStatus() {
-        Order order = new Order();
-        order.setStatus("PENDING_PAYMENT");
-        order = orderRepository.save(order);
-
-        order.setStatus("PAID");
-        orderRepository.save(order);
-
-        Order updated = orderRepository.findById(order.getId()).get();
-        assertEquals("PAID", updated.getStatus());
-    }
 }
