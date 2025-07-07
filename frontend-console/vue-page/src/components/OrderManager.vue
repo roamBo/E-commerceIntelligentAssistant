@@ -10,6 +10,7 @@
           clearable
         />
         <el-button type="primary" class="search-btn">搜索</el-button>
+        <el-button type="success" @click="showCreateOrderDialog">创建订单</el-button>
       </div>
     </div>
 
@@ -53,6 +54,7 @@
           <div class="order-info">
             <span class="order-id">订单编号: {{ order.id }}</span>
             <span class="order-date">下单时间: {{ order.date }}</span>
+            <span class="user-id">用户ID: {{ order.userId }}</span>
           </div>
           <div class="order-status">
             <el-tag :type="getStatusType(order.status)">{{ getStatusText(order.status) }}</el-tag>
@@ -70,6 +72,11 @@
               <div class="product-price">¥{{ product.price.toFixed(2) }} × {{ product.quantity }}</div>
             </div>
           </div>
+        </div>
+        
+        <div class="order-address" v-if="order.shippingAddress">
+          <i class="el-icon-location"></i>
+          <span>收货地址: {{ order.shippingAddress }}</span>
         </div>
         
         <div class="order-bottom">
@@ -91,107 +98,249 @@
         </div>
       </el-card>
     </div>
+
+    <!-- 创建订单对话框 -->
+    <el-dialog
+      title="创建新订单"
+      :visible.sync="createOrderDialogVisible"
+      width="50%"
+      :before-close="handleCloseDialog"
+    >
+      <el-form :model="newOrderForm" label-width="120px" :rules="orderFormRules" ref="orderForm">
+        <el-form-item label="用户ID" prop="userId">
+          <el-input v-model.number="newOrderForm.userId" type="number"></el-input>
+        </el-form-item>
+        
+        <el-form-item label="收货地址" prop="shippingAddress">
+          <el-input v-model="newOrderForm.shippingAddress" type="textarea" :rows="2"></el-input>
+        </el-form-item>
+        
+        <el-form-item label="商品" prop="products">
+          <div v-for="(product, index) in newOrderForm.products" :key="index" class="product-form-item">
+            <el-row :gutter="10">
+              <el-col :span="6">
+                <el-form-item :prop="`products.${index}.productId`" :rules="{ required: true, message: '请输入商品ID', trigger: 'blur' }">
+                  <el-input v-model="product.productId" placeholder="商品ID"></el-input>
+                </el-form-item>
+              </el-col>
+              <el-col :span="6">
+                <el-form-item :prop="`products.${index}.productName`" :rules="{ required: true, message: '请输入商品名称', trigger: 'blur' }">
+                  <el-input v-model="product.productName" placeholder="商品名称"></el-input>
+                </el-form-item>
+              </el-col>
+              <el-col :span="4">
+                <el-form-item :prop="`products.${index}.quantity`" :rules="{ required: true, type: 'number', min: 1, message: '数量必须大于0', trigger: 'blur' }">
+                  <el-input-number v-model="product.quantity" :min="1" placeholder="数量"></el-input-number>
+                </el-form-item>
+              </el-col>
+              <el-col :span="4">
+                <el-form-item :prop="`products.${index}.unitPrice`" :rules="{ required: true, type: 'number', min: 0.01, message: '价格必须大于0', trigger: 'blur' }">
+                  <el-input-number v-model="product.unitPrice" :min="0.01" :precision="2" placeholder="单价"></el-input-number>
+                </el-form-item>
+              </el-col>
+              <el-col :span="4">
+                <el-button type="danger" icon="el-icon-delete" circle @click="removeProduct(index)" v-if="newOrderForm.products.length > 1"></el-button>
+              </el-col>
+            </el-row>
+          </div>
+          
+          <div class="add-product-btn">
+            <el-button type="primary" icon="el-icon-plus" @click="addProduct">添加商品</el-button>
+          </div>
+        </el-form-item>
+        
+        <el-form-item label="总金额">
+          <span class="calculated-amount">¥{{ calculateNewOrderAmount() }}</span>
+        </el-form-item>
+      </el-form>
+      
+      <span slot="footer" class="dialog-footer">
+        <el-button @click="handleCloseDialog">取消</el-button>
+        <el-button type="primary" @click="submitNewOrder" :loading="submitting">确定</el-button>
+      </span>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, reactive } from 'vue'
+import orderService from '../services/orderService'
+import orderModel from '../services/orderModel'
 
 const searchKeyword = ref('')
 const orderStatus = ref('all')
 const dateRange = ref([])
 const loading = ref(false)
+const submitting = ref(false)
+const createOrderDialogVisible = ref(false)
 
-// 真实订单数据应通过API获取
+// 订单表单相关
+const orderForm = ref(null)
+const newOrderForm = reactive({
+  userId: 551,
+  shippingAddress: '',
+  products: [
+    {
+      productId: '',
+      productName: '',
+      quantity: 1,
+      unitPrice: 0
+    }
+  ]
+})
+
+// 表单验证规则
+const orderFormRules = {
+  userId: [
+    { required: true, message: '请输入用户ID', trigger: 'blur' },
+    { type: 'number', message: '用户ID必须为数字', trigger: 'blur' }
+  ],
+  shippingAddress: [
+    { required: true, message: '请输入收货地址', trigger: 'blur' }
+  ]
+}
+
+// 添加商品
+const addProduct = () => {
+  newOrderForm.products.push({
+    productId: '',
+    productName: '',
+    quantity: 1,
+    unitPrice: 0
+  })
+}
+
+// 移除商品
+const removeProduct = (index) => {
+  newOrderForm.products.splice(index, 1)
+}
+
+// 计算新订单总金额
+const calculateNewOrderAmount = () => {
+  return newOrderForm.products.reduce((sum, product) => {
+    return sum + (product.quantity || 0) * (product.unitPrice || 0)
+  }, 0).toFixed(2)
+}
+
+// 显示创建订单对话框
+const showCreateOrderDialog = () => {
+  createOrderDialogVisible.value = true
+}
+
+// 关闭对话框
+const handleCloseDialog = () => {
+  createOrderDialogVisible.value = false
+  // 重置表单
+  if (orderForm.value) {
+    orderForm.value.resetFields()
+  }
+  // 重置商品列表
+  newOrderForm.products = [
+    {
+      productId: '',
+      productName: '',
+      quantity: 1,
+      unitPrice: 0
+    }
+  ]
+}
+
+// 提交新订单
+const submitNewOrder = async () => {
+  if (orderForm.value) {
+    orderForm.value.validate(async (valid) => {
+      if (valid) {
+        submitting.value = true
+        try {
+          // 创建订单数据
+          const orderData = {
+            userId: newOrderForm.userId,
+            shippingAddress: newOrderForm.shippingAddress,
+            products: newOrderForm.products.map(p => ({
+              id: p.productId,
+              name: p.productName,
+              quantity: p.quantity,
+              price: p.unitPrice
+            }))
+          }
+          
+          await orderService.createOrder(orderData)
+          createOrderDialogVisible.value = false
+          // 重新加载订单列表
+          fetchOrders()
+        } catch (error) {
+          console.error('创建订单失败:', error)
+        } finally {
+          submitting.value = false
+        }
+      }
+    })
+  }
+}
+
+// 订单数据
 const orders = ref([])
 
-// 模拟API加载
-const loadOrders = () => {
+// 获取订单列表
+const fetchOrders = async () => {
   loading.value = true
-  // 这里应该是实际的API调用
-  setTimeout(() => {
+  try {
+    orders.value = await orderService.getOrders()
+  } finally {
     loading.value = false
-    // 数据将由实际API填充
-  }, 800)
+  }
 }
 
 // 初始加载
-loadOrders()
+onMounted(() => {
+  fetchOrders()
+})
 
 // 根据筛选条件过滤订单
 const filteredOrders = computed(() => {
+  // 使用 orderService 的方法进行过滤
   let result = orders.value
-
-  // 根据订单状态筛选
-  if (orderStatus.value !== 'all') {
-    result = result.filter(order => order.status === orderStatus.value)
-  }
-
+  
+  // 根据订单状态过滤
+  result = orderService.filterOrdersByStatus(result, orderStatus.value)
+  
   // 根据关键词搜索
-  if (searchKeyword.value) {
-    const keyword = searchKeyword.value.toLowerCase()
-    result = result.filter(order => {
-      // 搜索订单编号
-      if (order.id?.toLowerCase().includes(keyword)) return true
-      
-      // 搜索商品名称
-      for (const product of (order.products || [])) {
-        if (product.name?.toLowerCase().includes(keyword)) return true
-      }
-      
-      return false
-    })
-  }
-
-  // 根据日期范围筛选
-  if (dateRange.value && dateRange.value.length === 2) {
-    const startDate = new Date(dateRange.value[0])
-    const endDate = new Date(dateRange.value[1])
-    
-    result = result.filter(order => {
-      if (!order.date) return false
-      const orderDate = new Date(order.date.split(' ')[0])
-      return orderDate >= startDate && orderDate <= endDate
-    })
-  }
-
+  result = orderService.searchOrders(result, searchKeyword.value)
+  
+  // 根据日期范围过滤
+  result = orderService.filterOrdersByDateRange(result, dateRange.value)
+  
   return result
 })
 
 // 获取订单状态对应的Tag类型
 const getStatusType = (status) => {
-  const types = {
-    pending: 'warning',
-    processing: 'info',
-    shipped: 'primary',
-    completed: 'success'
-  }
-  return types[status] || 'info'
+  return orderService.getStatusType(status)
 }
 
 // 获取订单状态的中文描述
 const getStatusText = (status) => {
-  const texts = {
-    pending: '待付款',
-    processing: '处理中',
-    shipped: '已发货',
-    completed: '已完成'
-  }
-  return texts[status] || status
+  return orderService.getStatusText(status)
 }
 
-// 计算订单商品总数量
+// 计算订单商品总数
 const getTotalQuantity = (order) => {
-  return (order.products || []).reduce((sum, product) => sum + (product.quantity || 0), 0)
+  return orderService.calculateTotalQuantity(order)
 }
 
 // 计算订单总金额
 const getTotalAmount = (order) => {
-  return (order.products || []).reduce((sum, product) => sum + ((product.price || 0) * (product.quantity || 0)), 0)
+  return orderService.calculateTotalAmount(order)
 }
 </script>
 
 <style scoped>
+.user-id {
+  color: #409EFF;
+  font-weight: bold;
+  margin-left: 16px;
+}
+
 .loading-container {
   padding: 20px;
   background: #fff;
@@ -200,10 +349,13 @@ const getTotalAmount = (order) => {
 }
 
 .order-manager {
-  padding: 24px;
+  width: 100%;
   height: 100%;
-  overflow-y: auto;
+  padding: 24px;
   background: #f5f7fa;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
 }
 
 .order-header {
@@ -314,6 +466,15 @@ const getTotalAmount = (order) => {
   color: #606266;
 }
 
+.order-address {
+  padding-top: 16px;
+  border-top: 1px solid #ebeef5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #606266;
+}
+
 .order-bottom {
   padding-top: 16px;
   border-top: 1px solid #ebeef5;
@@ -356,5 +517,84 @@ const getTotalAmount = (order) => {
 .order-actions {
   display: flex;
   gap: 8px;
+}
+
+.filter-controls {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 20px;
+  flex-wrap: wrap; /* 允许在小屏幕上换行 */
+}
+
+.data-table {
+  flex: 1;
+  overflow: auto; /* 确保表格内容可滚动 */
+}
+
+/* 添加响应式设计 */
+@media (max-width: 768px) {
+  .order-manager {
+    padding: 16px;
+  }
+  
+  .order-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  
+  .filter-controls {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .filter-controls .el-select,
+  .filter-controls .el-date-picker {
+    width: 100% !important;
+    margin-bottom: 10px;
+  }
+  
+  .data-table {
+    overflow-x: auto; /* 确保表格可以水平滚动 */
+  }
+  
+  /* 调整表格在小屏幕上的显示 */
+  :deep(.el-table) {
+    width: 100%;
+    overflow-x: auto;
+  }
+  
+  :deep(.el-table__body),
+  :deep(.el-table__header) {
+    min-width: 600px; /* 确保表格有最小宽度 */
+  }
+}
+
+/* 对于非常小的屏幕 */
+@media (max-width: 480px) {
+  .order-manager {
+    padding: 10px;
+  }
+  
+  .order-header h2 {
+    font-size: 20px;
+  }
+}
+
+.product-form-item {
+  margin-bottom: 15px;
+  border-bottom: 1px dashed #ebeef5;
+  padding-bottom: 15px;
+}
+
+.add-product-btn {
+  margin-top: 15px;
+}
+
+.calculated-amount {
+  font-size: 18px;
+  color: #f56c6c;
+  font-weight: bold;
 }
 </style> 

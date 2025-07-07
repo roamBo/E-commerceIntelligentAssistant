@@ -83,3 +83,46 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+/* 添加全局响应式样式 */
+@media (max-width: 768px) {
+  .app-container {
+    flex-direction: column;
+  }
+  
+  /* 确保内容区域在小屏幕上有适当的高度和滚动 */
+  .main-content {
+    height: calc(100% - 64px);
+    overflow-y: auto;
+    padding-top: 64px; /* 留出顶部导航栏的空间 */
+  }
+}
+
+/* 确保滚动条样式一致 */
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(100, 255, 218, 0.3);
+  border-radius: 3px;
+}
+
+/* 添加溢出保护 */
+.overflow-auto {
+  overflow: auto;
+}
+
+.overflow-hidden {
+  overflow: hidden;
+}
+
+/* 确保内容能适应容器 */
+img, table, div {
+  max-width: 100%;
+}
