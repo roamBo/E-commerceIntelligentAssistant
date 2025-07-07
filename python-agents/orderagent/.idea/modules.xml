@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+<<<<<<<< HEAD:python-agents/orderagent/.idea/modules.xml
+      <module fileurl="file://$PROJECT_DIR$/.idea/orderagent.iml" filepath="$PROJECT_DIR$/.idea/orderagent.iml" />
+========
+      <module fileurl="file://$PROJECT_DIR$/.idea/guideagent.iml" filepath="$PROJECT_DIR$/.idea/guideagent.iml" />
+>>>>>>>> 8b283e6505523048ab3b8df02b7682735c2b39cc:python-agents/guideagent/.idea/modules.xml
+    </modules>
+  </component>
+</project>
