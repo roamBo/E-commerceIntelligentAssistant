@@ -22,7 +22,7 @@ const handleLoginSuccess = () => {
 
 <template>
   <div class="app-container">
-    <Sidebar @change="handleSidebarChange" @login="handleSidebarLogin" />
+    <Sidebar :currentPage="currentPage" @change="handleSidebarChange" @login="handleSidebarLogin" />
     <main class="main-content">
       <HomePage v-if="currentPage === 'home'" @change="currentPage = $event" />
       <OrderManager v-if="currentPage === 'order'" />

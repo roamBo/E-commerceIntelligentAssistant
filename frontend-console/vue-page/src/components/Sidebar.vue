@@ -71,10 +71,17 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
+
+const props = defineProps({
+  currentPage: {
+    type: String,
+    default: 'home'
+  }
+})
 
 const hoverIndex = ref(null)
-const activeIndex = ref(null)
+const activeIndex = ref(props.currentPage)
 
 const menuItems = [
   {
@@ -108,7 +115,12 @@ const handleLoginClick = () => {
 }
 
 onMounted(() => {
-  activeIndex.value = 'home'
+  activeIndex.value = props.currentPage
+})
+
+// 监听currentPage变化，自动切换高亮
+watch(() => props.currentPage, (newVal) => {
+  activeIndex.value = newVal
 })
 </script>
 
