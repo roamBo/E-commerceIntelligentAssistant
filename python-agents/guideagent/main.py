@@ -1,7 +1,6 @@
 # main.py
 import nest_asyncio
-
-nest_asyncio.apply()  # 解决 asyncio.run() 错误
+nest_asyncio.apply() # 解决 asyncio.run() 错误
 
 import os
 from typing import Dict, Any
@@ -15,13 +14,12 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import Config
-from models import ChatRequest, ChatResponse  # 导入API模型
-from agent import get_agent_executor  # 导入获取AgentExecutor的函数
+from models import ChatRequest, ChatResponse # 导入API模型
+from agent import get_guide_agent # 【修改】导入获取 GuideAgent 实例的函数
 
 # 【条件导入】如果使用外部API，则导入 ProductAPIClient
 if Config.USE_EXTERNAL_PRODUCT_API:
     from services.product_api_client import get_product_api_client
-
 
 # --- FastAPI 应用实例 ---
 @asynccontextmanager
@@ -46,7 +44,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         raise RuntimeError(f"❌ API 启动失败：无法连接到 Redis 服务器: {Config.REDIS_URL}. 错误详情: {e}")
 
-    # 【修改】根据配置决定是否连接外部商品 API
+    # 根据配置决定是否连接外部商品 API
     if Config.USE_EXTERNAL_PRODUCT_API:
         try:
             product_client = await get_product_api_client()
@@ -58,7 +56,10 @@ async def lifespan(app: FastAPI):
     else:
         print("ℹ️ 未配置 PRODUCT_API_BASE_URL，将使用硬编码商品数据。")
 
-    yield  # 在这里，应用开始处理请求
+    # 【修改】初始化 GuideAgent 实例
+    await get_guide_agent()
+
+    yield # 在这里，应用开始处理请求
 
     # 应用关闭时执行的代码
     if Config.USE_EXTERNAL_PRODUCT_API:
@@ -78,7 +79,7 @@ app = FastAPI(
 # CORS 配置
 origins = [
     "http://localhost",
-    "http://localhost:5173",  # Vue 前端开发服务器的地址
+    "http://localhost:5173", # Vue 前端开发服务器的地址
 ]
 
 app.add_middleware(
@@ -87,8 +88,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-)
-
+ )
 
 # --- API 端点 ---
 @app.post("/chat", response_model=ChatResponse)
@@ -97,11 +97,9 @@ async def chat_endpoint(request: ChatRequest):
     user_input = request.user_input
 
     try:
-        agent_executor = get_agent_executor(session_id)
-
-        # 调用 AgentExecutor
-        response = await agent_executor.ainvoke({"input": user_input, "chat_history": []})
-        final_report = response['output']
+        # 【修改】通过 get_guide_agent() 获取实例，并调用其 process_message 方法
+        guide_agent = await get_guide_agent()
+        final_report = await guide_agent.process_message(user_input, session_id)
 
         return ChatResponse(response=final_report, session_id=session_id)
 
@@ -111,7 +109,6 @@ async def chat_endpoint(request: ChatRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"内部服务器错误: {e}")
 
-
 # --- 运行 FastAPI 应用 ---
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8085)
