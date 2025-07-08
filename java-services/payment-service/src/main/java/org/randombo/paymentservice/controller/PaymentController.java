@@ -1,5 +1,6 @@
 package org.randombo.paymentservice.controller;
 
+import com.alipay.api.AlipayApiException;
 import org.randombo.paymentservice.model.Payment;
 import org.randombo.paymentservice.service.PaymentService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -68,7 +69,10 @@ public class PaymentController {
     }
 
     @PostMapping("/alipay")
-    public ResponseEntity<String> createAlipayOrder(@RequestParam String outTradeNo, @RequestParam String totalAmount, @RequestParam String subject) {
+    public ResponseEntity<String> createAlipayOrder
+            (@RequestParam String outTradeNo,
+             @RequestParam String totalAmount,
+             @RequestParam String subject) throws AlipayApiException {
         String result = paymentService.createAlipayOrder(outTradeNo, totalAmount, subject);
         return result != null ?
                 ResponseEntity.ok(result) :
