@@ -84,4 +84,45 @@ public class OrderServiceTest {
         List<Order> list = orderService.findLongPendingPaymentOrders(30);
         assertFalse(list.isEmpty());
     }
+
+    // 测试orderID唯一性
+    @Test
+    public void testUniqueOrderIdConstraint() {
+        // 模拟保存直接返回原对象
+        when(orderRepository.save(any())).thenAnswer(inv -> inv.getArguments()[0]);
+
+        // 创建第一个订单
+        Order o1 = new Order();
+        o1.setOrderId("DUPLICATE_ID");
+        orderService.createOrder(o1);
+
+        // 尝试创建相同ID的订单
+        Order o2 = new Order();
+        o2.setOrderId("DUPLICATE_ID");
+
+        when(orderRepository.findByOrderId("DUPLICATE_ID")).thenReturn(Optional.of(o2));
+
+        assertThrows(IllegalArgumentException.class, () ->
+                orderService.createOrder(o2));
+    }
+
+    // 示例：创建->支付->查询全流程
+    @Test
+    public void testOrderLifecycle() {
+        // 模拟保存直接返回原对象
+        when(orderRepository.save(any())).thenAnswer(inv -> inv.getArguments()[0]);
+        // 创建
+        Order order = orderService.createOrder(new Order());
+
+        // 支付
+        String OrderId = order.getOrderId();
+        when(orderRepository.findByOrderId(OrderId)).thenReturn(Optional.of(order));
+        orderService.simulatePayment(OrderId);
+
+        // 验证
+        Optional<Order> orderOptional = orderRepository.findByOrderId(OrderId);
+        assertTrue(orderOptional.isPresent());
+        Order paid = orderOptional.get();
+        assertEquals("PAID", paid.getStatus());
+    }
 }
