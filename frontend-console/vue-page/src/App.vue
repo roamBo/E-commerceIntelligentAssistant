@@ -6,8 +6,19 @@ import OrderManager from './components/OrderManager.vue'
 import ShoppingGuide from './components/ShoppingGuide.vue'
 import PaymentSystem from './components/PaymentSystem.vue'
 import LoginPage from './components/LoginPage.vue'
+import UserInfo from './components/UserInfo.vue'
 
 const currentPage = ref('home')
+const loginUser = ref(null)
+
+// 初始化時檢查 localStorage
+if (localStorage.getItem('loginUser')) {
+  try {
+    loginUser.value = JSON.parse(localStorage.getItem('loginUser'))
+  } catch (e) {
+    loginUser.value = null
+  }
+}
 
 const handleSidebarChange = (page) => {
   currentPage.value = page
@@ -18,17 +29,32 @@ const handleSidebarLogin = () => {
 const handleLoginSuccess = () => {
   currentPage.value = 'home'
 }
+
+const onLogin = (user) => {
+  loginUser.value = user
+}
+const onShowUser = (user) => {
+  loginUser.value = user
+}
+const onLogout = () => {
+  loginUser.value = null
+  localStorage.removeItem('loginUser')
+}
+const handleGoLogin = () => {
+  currentPage.value = 'login'
+}
 </script>
 
 <template>
   <div class="app-container">
     <Sidebar :currentPage="currentPage" @change="handleSidebarChange" @login="handleSidebarLogin" />
     <main class="main-content">
-      <HomePage v-if="currentPage === 'home'" @change="currentPage = $event" />
-      <OrderManager v-if="currentPage === 'order'" />
+      <LoginPage v-if="currentPage === 'login' && !loginUser" @login="onLogin" @showUser="onShowUser" />
+      <UserInfo v-if="currentPage === 'login' && loginUser" :user="loginUser" @logout="onLogout" />
+      <HomePage v-if="currentPage === 'home'" />
+      <OrderManager v-if="currentPage === 'order'" @goLogin="handleGoLogin" />
       <ShoppingGuide v-if="currentPage === 'guide'" />
-      <PaymentSystem v-if="currentPage === 'payment'" @change="currentPage = $event" />
-      <LoginPage v-if="currentPage === 'login'" @login="handleLoginSuccess" />
+      <PaymentSystem v-if="currentPage === 'payment'" />
     </main>
   </div>
 </template>
