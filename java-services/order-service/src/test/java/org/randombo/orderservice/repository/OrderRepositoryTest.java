@@ -65,4 +65,54 @@ public class OrderRepositoryTest {
 
         assertFalse(abnormalOrders.isEmpty(), "应能查到一条超时未支付订单");
     }
+
+    // 测试订单删除
+    @Test
+    public void testDeleteOrder() {
+        Order order = new Order();
+        order.setOrderId("ORDER-DEL");
+        orderRepository.save(order);
+
+        orderRepository.delete(order);
+        assertFalse(orderRepository.findByOrderId("ORDER-DEL").isPresent());
+    }
+
+    // 测试订单状态更新
+    @Test
+    public void testUpdateStatus() {
+        Order order = new Order();
+        order.setStatus("PENDING_PAYMENT");
+        order = orderRepository.save(order);
+
+        order.setStatus("PAID");
+        orderRepository.save(order);
+
+        Order updated = orderRepository.findById(order.getId()).get();
+        assertEquals("PAID", updated.getStatus());
+    }
+
+    // 测试orderID唯一性
+    // OrderRepositoryTest.java 新增测试
+    @Test
+    public void testUniqueOrderIdConstraint() {
+        // 创建第一个订单
+        Order o1 = new Order();
+        o1.setOrderId("DUPLICATE_ID");
+        orderRepository.save(o1);
+
+        // 尝试创建相同ID的订单
+        Order o2 = new Order();
+        o2.setOrderId("DUPLICATE_ID");
+
+        try {
+            orderRepository.save(o2);
+            fail("应触发唯一约束异常");
+        } catch (Exception ex) {
+            // 验证异常类型（不依赖具体框架异常）
+            assertInstanceOf(RuntimeException.class, ex, "应抛出运行时异常");
+            assertTrue(ex.getMessage().contains("constraint") ||
+                            ex.getCause().getMessage().contains("unique"),
+                    "异常应指示唯一约束违反");
+        }
+    }
 }
