@@ -20,7 +20,7 @@
     </div>
     <!-- 註冊彈窗 -->
     <el-dialog v-model="registerDialog" title="注册新用户" width="400px">
-      <el-form :model="registerForm" :rules="registerRules" ref="registerFormRef" label-width="0">
+      <el-form :model="registerForm" :rules="registerRules" ref="registerFormRef" label-width="0" @keyup.enter.native="onRegisterSubmit" tabindex="0">
         <el-form-item prop="username">
           <el-input v-model="registerForm.username" placeholder="用戶名" />
         </el-form-item>
