@@ -10,6 +10,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class OrderService {
@@ -36,7 +38,9 @@ public class OrderService {
     public Order createOrder(Order newOrder) {
         newOrder.setOrderId("ORDER-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
         newOrder.setOrderTime(LocalDateTime.now());
-        newOrder.setStatus("PENDING_PAYMENT"); // XXXX 改为字符串
+        newOrder.setStatus("PENDING_PAYMENT");
+        // XXXX 计算 totalAmount 并设置
+        newOrder.setTotalAmount(newOrder.calculateTotalAmount()); // 根据商品总和计算
         Order savedOrder = orderRepository.save(newOrder);
         System.out.println("创建订单: " + savedOrder.getOrderId() + " 到数据库。");
         return savedOrder;
@@ -63,16 +67,56 @@ public class OrderService {
             if (updatedOrderData.getUserId() != null) {
                 existingOrder.setUserId(updatedOrderData.getUserId());
             }
-            if (updatedOrderData.getTotalAmount() != null) {
-                existingOrder.setTotalAmount(updatedOrderData.getTotalAmount());
-            }
+            // totalAmount 现在由items计算，这里不直接设置
             if (updatedOrderData.getShippingAddress() != null) {
                 existingOrder.setShippingAddress(updatedOrderData.getShippingAddress());
             }
-            // updatedOrderData.getStatus() 现在是String类型
             if (updatedOrderData.getStatus() != null) {
                 existingOrder.setStatus(updatedOrderData.getStatus());
             }
+
+            // XXXX 修正：更安全地更新items集合 for @OneToMany with orphanRemoval=true
+            if (updatedOrderData.getItems() != null) {
+                // 创建一个Map，用于快速查找传入的订单项（以ID为键）
+                Map<Long, Order.OrderItem> incomingItemsMap = updatedOrderData.getItems().stream()
+                        .filter(item -> item.getId() != null) // 只处理有ID的（即已存在的或传入ID的）
+                        .collect(Collectors.toMap(Order.OrderItem::getId, item -> item));
+
+                // 1. 识别并移除不再存在于传入列表的旧订单项 (触发orphanRemoval)
+                // 使用 removeIf 迭代时安全移除
+                existingOrder.getItems().removeIf(existingItem ->
+                        !incomingItemsMap.containsKey(existingItem.getId()) // 如果旧项的ID不在新项的Map中
+                );
+
+                // 2. 遍历传入的订单项，执行添加或更新操作
+                updatedOrderData.getItems().forEach(incomingItem -> {
+                    if (incomingItem.getId() == null) { // 这是新添加的订单项 (ID为null)
+                        existingOrder.getItems().add(incomingItem); // 直接添加到集合，JPA会新增
+                    } else { // 这是更新现有订单项 (ID不为null)
+                        // 在现有集合中查找该订单项
+                        existingOrder.getItems().stream()
+                                .filter(existingItem -> existingItem.getId().equals(incomingItem.getId()))
+                                .findFirst()
+                                .ifPresentOrElse( // 如果找到了，则更新其属性
+                                        foundItem -> {
+                                            foundItem.setProductId(incomingItem.getProductId());
+                                            foundItem.setProductName(incomingItem.getProductName());
+                                            foundItem.setQuantity(incomingItem.getQuantity());
+                                            foundItem.setUnitPrice(incomingItem.getUnitPrice());
+                                        },
+
+                                        () -> existingOrder.getItems().add(incomingItem)
+                                );
+                    }
+                });
+
+                // items更新后，重新计算totalAmount
+                existingOrder.setTotalAmount(existingOrder.calculateTotalAmount());
+            } else {
+                // 如果 updatedOrderData.getItems() 是 null，totalAmount 保持由现有items计算
+                existingOrder.setTotalAmount(existingOrder.calculateTotalAmount());
+            }
+
             return orderRepository.save(existingOrder);
         });
     }

@@ -8,19 +8,7 @@ spring:
     nacos:
       discovery:
         server-addr: 127.0.0.1:8848 # 你的Nacos服务器地址
-#   huangzheng
 
-#  datasource: # 数据库配置，在 spring: 下面
-#    url: jdbc:mysql://localhost:3306/ecommerce_order_db?useSSL=false&serverTimezone=UTC # 数据库URL
-#    username: root # 你的MySQL用户名
-#    password: 123456 # 你的MySQL密码
-#    driver-class-name: com.mysql.cj.jdbc.Driver
-#  jpa: # JPA 配置，在 spring: 下面
-#    hibernate:
-#      ddl-auto: update # 启动时自动更新数据库表结构（开发环境用，生产环境慎用）
-#    show-sql: true # 打印Hibernate生成的SQL
-
-# gaobo
   datasource:
     url: jdbc:mysql://localhost:3306/ecommerce_order_db?useSSL=false&serverTimezone=UTC
     username: root
