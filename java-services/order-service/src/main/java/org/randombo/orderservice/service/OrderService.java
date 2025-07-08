@@ -1,17 +1,17 @@
 package org.randombo.orderservice.service;
 
 import org.randombo.orderservice.model.Order;
-// import org.randombo.orderservice.model.OrderStatus; // XXXX 确保此导入已移除或注释掉
+// import org.randombo.orderservice.model.OrderStatus; // XXXX 移除此导入
 import org.randombo.orderservice.repository.OrderRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map; // 确保导入Map
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors; // 确保导入Collectors
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class OrderService {
@@ -36,20 +36,11 @@ public class OrderService {
 
     // 4. 创建订单
     public Order createOrder(Order newOrder) {
-        // XXXX 修正：如果传入的newOrder已经有orderId，则直接使用它 (为了测试重复订单号)
-        if (newOrder.getOrderId() == null || newOrder.getOrderId().isEmpty()) {
-            newOrder.setOrderId("ORDER-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase()); // 正常情况下自动生成
-        }
-
-        // XXXX 新增：在保存前检查orderId的唯一性（程序层面检查）
-        // 如果orderId已经存在，抛出异常，这将导致HTTP 400 Bad Request
-        if (orderRepository.findByOrderId(newOrder.getOrderId()).isPresent()) {
-            throw new IllegalArgumentException("Order ID " + newOrder.getOrderId() + " already exists. Please try again or use a different ID.");
-        }
-
+        newOrder.setOrderId("ORDER-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
         newOrder.setOrderTime(LocalDateTime.now());
-        newOrder.setStatus("PENDING_PAYMENT"); // 改为字符串
-        newOrder.setTotalAmount(newOrder.calculateTotalAmount()); // 总金额由items计算
+        newOrder.setStatus("PENDING_PAYMENT");
+        // XXXX 计算 totalAmount 并设置
+        newOrder.setTotalAmount(newOrder.calculateTotalAmount()); // 根据商品总和计算
         Order savedOrder = orderRepository.save(newOrder);
         System.out.println("创建订单: " + savedOrder.getOrderId() + " 到数据库。");
         return savedOrder;
@@ -60,8 +51,8 @@ public class OrderService {
         Optional<Order> orderOptional = orderRepository.findByOrderId(orderId);
         if (orderOptional.isPresent()) {
             Order order = orderOptional.get();
-            if (order.getStatus().equals("PENDING_PAYMENT")) { // 使用 .equals() 比较字符串
-                order.setStatus("PAID"); // 改为字符串
+            if (order.getStatus().equals("PENDING_PAYMENT")) { // XXXX 使用 .equals() 比较字符串
+                order.setStatus("PAID"); // XXXX 改为字符串
                 orderRepository.save(order);
                 System.out.println("订单 " + orderId + " 已支付并更新到数据库。");
                 return true;
@@ -76,6 +67,7 @@ public class OrderService {
             if (updatedOrderData.getUserId() != null) {
                 existingOrder.setUserId(updatedOrderData.getUserId());
             }
+            // totalAmount 现在由items计算，这里不直接设置
             if (updatedOrderData.getShippingAddress() != null) {
                 existingOrder.setShippingAddress(updatedOrderData.getShippingAddress());
             }
@@ -91,6 +83,7 @@ public class OrderService {
                         .collect(Collectors.toMap(Order.OrderItem::getId, item -> item));
 
                 // 1. 识别并移除不再存在于传入列表的旧订单项 (触发orphanRemoval)
+                // 使用 removeIf 迭代时安全移除
                 existingOrder.getItems().removeIf(existingItem ->
                         !incomingItemsMap.containsKey(existingItem.getId()) // 如果旧项的ID不在新项的Map中
                 );
@@ -111,8 +104,7 @@ public class OrderService {
                                             foundItem.setQuantity(incomingItem.getQuantity());
                                             foundItem.setUnitPrice(incomingItem.getUnitPrice());
                                         },
-                                        // 如果没有找到 (可能在之前被清除了又加回来，或者原本就不在集合中)
-                                        // 此时我们认为它是一个需要重新关联的项，直接添加即可。
+
                                         () -> existingOrder.getItems().add(incomingItem)
                                 );
                     }
@@ -154,7 +146,7 @@ public class OrderService {
     // 9. 查找长时间未支付的订单（异常预警逻辑）
     public List<Order> findLongPendingPaymentOrders(long minutes) {
         LocalDateTime threshold = LocalDateTime.now().minusMinutes(minutes);
-        return orderRepository.findByStatusAndOrderTimeBefore("PENDING_PAYMENT", threshold); // 改为字符串
+        return orderRepository.findByStatusAndOrderTimeBefore("PENDING_PAYMENT", threshold); // XXXX 改为字符串
     }
 
     // 10. 异常处理示例：标记异常订单或记录日志
@@ -169,17 +161,18 @@ public class OrderService {
     // 11. 通过API查询异常订单的方法
     public List<Order> getAbnormalPendingOrders(long minutes) {
         LocalDateTime threshold = LocalDateTime.now().minusMinutes(minutes);
-        return orderRepository.findByStatusAndOrderTimeBefore("PENDING_PAYMENT", threshold); // 改为字符串
+        return orderRepository.findByStatusAndOrderTimeBefore("PENDING_PAYMENT", threshold); // XXXX 改为字符串
     }
 
     // 12. 专门的订单状态转换方法
-    public Optional<Order> updateOrderStatus(String orderId, String newStatusString) {
+    public Optional<Order> updateOrderStatus(String orderId, String newStatusString) { // XXXX 接收String
         return orderRepository.findByOrderId(orderId).map(order -> {
+            // XXXX 修正逻辑：直接用字符串比较和赋值
             if (newStatusString.equals("PENDING_PAYMENT") && !order.getStatus().equals("PENDING_PAYMENT")) {
                 System.out.println("WARN: Cannot revert order " + orderId + " to PENDING_PAYMENT from " + order.getStatus());
                 return null;
             }
-            order.setStatus(newStatusString);
+            order.setStatus(newStatusString); // XXXX 直接赋值字符串
             Order updated = orderRepository.save(order);
             System.out.println("订单 " + orderId + " 状态更新为 " + newStatusString);
             return updated;
