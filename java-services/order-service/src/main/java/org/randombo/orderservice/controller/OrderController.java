@@ -9,8 +9,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Optional;
-import jakarta.validation.Valid;
-
+@CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/api/orders") // 定义基础路径
 public class OrderController {
@@ -43,7 +42,7 @@ public class OrderController {
     // 4. 创建订单：POST /api/orders
     // 智能客服可能通过此API创建新的订单
     @PostMapping
-    public Order createOrder(@Valid @RequestBody Order order) {
+    public Order createOrder(@RequestBody Order order) {
         return orderService.createOrder(order);
     }
 
@@ -61,7 +60,7 @@ public class OrderController {
 
     // 6. 通用订单更新 API: PUT /api/orders/{orderId}
     @PutMapping("/{orderId}")
-    public ResponseEntity<Order> updateOrder(@PathVariable String orderId, @Valid @RequestBody Order orderDetails) {
+    public ResponseEntity<Order> updateOrder(@PathVariable String orderId, @RequestBody Order orderDetails) {
         return orderService.updateOrder(orderId, orderDetails)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
