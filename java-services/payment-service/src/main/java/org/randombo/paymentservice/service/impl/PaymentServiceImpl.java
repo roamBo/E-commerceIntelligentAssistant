@@ -66,6 +66,14 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     public Payment updatePaymentStatus(String id, String status) {
+        // 定义合法的状态列表
+        List<String> validStatuses = List.of("PENDING", "SUCCESS", "FAILED");
+
+        // 验证传入的状态是否合法
+        if (!validStatuses.contains(status)) {
+            throw new IllegalArgumentException("Invalid payment status: " + status);
+        }
+
         return paymentRepository.findById(id)
                 .map(payment -> {
                     payment.setStatus(status);
