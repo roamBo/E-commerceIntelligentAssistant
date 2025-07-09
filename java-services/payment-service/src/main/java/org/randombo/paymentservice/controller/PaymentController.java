@@ -9,6 +9,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
+
 @CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/api/payments")
@@ -22,6 +24,7 @@ public class PaymentController {
 
     @PostMapping
     public ResponseEntity<Payment> createPayment(@RequestBody Payment payment) {
+        payment.setId(UUID.randomUUID().toString());
         Payment createdPayment = paymentService.createPayment(payment);
         return new ResponseEntity<>(createdPayment, HttpStatus.CREATED);
     }
@@ -32,7 +35,7 @@ public class PaymentController {
         return ResponseEntity.ok(payments);
     }
 
-    @GetMapping("/{id}/")
+    @GetMapping("/{id}")
     public ResponseEntity<Payment> getPaymentById(@PathVariable String id) {
         Payment payment = paymentService.getPaymentById(id);
         return payment != null ?
@@ -68,14 +71,5 @@ public class PaymentController {
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("/alipay")
-    public ResponseEntity<String> createAlipayOrder
-            (@RequestParam String outTradeNo,
-             @RequestParam String totalAmount,
-             @RequestParam String subject) throws AlipayApiException {
-        String result = paymentService.createAlipayOrder(outTradeNo, totalAmount, subject);
-        return result != null ?
-                ResponseEntity.ok(result) :
-                ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+
 }
