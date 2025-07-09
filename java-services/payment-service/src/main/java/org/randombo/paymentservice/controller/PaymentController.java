@@ -1,6 +1,5 @@
 package org.randombo.paymentservice.controller;
 
-import com.alipay.api.AlipayApiException;
 import org.randombo.paymentservice.model.Payment;
 import org.randombo.paymentservice.service.PaymentService;
 import org.springframework.beans.factory.annotation.Autowired;
