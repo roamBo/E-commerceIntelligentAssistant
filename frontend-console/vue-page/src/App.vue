@@ -21,6 +21,7 @@ if (localStorage.getItem('loginUser')) {
 }
 
 const handleSidebarChange = (page) => {
+  console.log('App: Changing page to', page)
   currentPage.value = page
 }
 const handleSidebarLogin = () => {
@@ -53,8 +54,8 @@ const handleGoLogin = () => {
       <UserInfo v-if="currentPage === 'login' && loginUser" :user="loginUser" @logout="onLogout" />
       <HomePage v-if="currentPage === 'home'" />
       <OrderManager v-if="currentPage === 'order'" @goLogin="handleGoLogin" />
-      <ShoppingGuide v-if="currentPage === 'guide'" />
-      <PaymentSystem v-if="currentPage === 'payment'" />
+      <ShoppingGuide v-if="currentPage === 'guide'" @goLogin="handleGoLogin" />
+      <PaymentSystem v-if="currentPage === 'payment'" @change="handleSidebarChange" />
     </main>
   </div>
 </template>

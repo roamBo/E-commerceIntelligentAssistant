@@ -270,6 +270,7 @@ const closeModal = () => {
 // 返回首页
 const goBack = () => {
   // 发射事件通知父组件切换到首页
+  console.log('PaymentSystem: Emitting change event to navigate to home page');
   emit('change', 'home');
 };
 
