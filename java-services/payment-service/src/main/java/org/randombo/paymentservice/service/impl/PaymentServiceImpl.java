@@ -1,10 +1,5 @@
 package org.randombo.paymentservice.service.impl;
 
-import com.alipay.api.AlipayApiException;
-import com.alipay.api.AlipayClient;
-import com.alipay.api.AlipayConfig;
-import com.alipay.api.DefaultAlipayClient;
-import com.alipay.api.request.AlipayTradePagePayRequest;
 import org.randombo.paymentservice.model.Payment;
 import org.randombo.paymentservice.repository.PaymentRepository;
 import org.randombo.paymentservice.service.PaymentService;
@@ -17,7 +12,6 @@ import java.util.List;
 @Service
 public class PaymentServiceImpl implements PaymentService {
     private final PaymentRepository paymentRepository;
-
 
 
     @Autowired
