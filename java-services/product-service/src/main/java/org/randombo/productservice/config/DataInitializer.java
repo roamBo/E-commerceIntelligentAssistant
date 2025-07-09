@@ -33,11 +33,23 @@ public class DataInitializer implements CommandLineRunner {
                 System.out.println("数据库为空，开始初始化测试数据...");
                 initializeTestData();
             } else {
+                // else 分支：数据库已有数据
                 System.out.println("数据库中已有数据，跳过初始化");
-                System.out.println("现有商品列表：");
-                existingProducts.forEach(product ->
-                        System.out.println("   - " + product.getName() + " (¥" + product.getPrice() + ")")
-                );
+                System.out.println("现有商品列表（最多显示 20 条）：");
+
+                existingProducts.stream()        // 将 List 转为 Stream
+                        .limit(20)               // 只保留前 20 条
+                        .forEach(product ->
+                                System.out.println("   - " + product.getName() +
+                                        " (¥" + product.getPrice() + ")")
+                        );
+
+                // 如果商品总数 > 20，再提示省略了多少
+                if (existingProducts.size() > 20) {
+                    System.out.println("   ... 其余 " +
+                            (existingProducts.size() - 20) +
+                            " 条已省略");
+                }
             }
         } catch (Exception e) {
             System.err.println("数据初始化失败: " + e.getMessage());

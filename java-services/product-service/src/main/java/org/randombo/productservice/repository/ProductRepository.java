@@ -16,23 +16,23 @@ public interface ProductRepository extends ElasticsearchRepository<Product, Stri
     // 根据名称搜索
     List<Product> findByNameContaining(String name);
 
-    // 新增：使用Elasticsearch查询进行更精确的中文搜索
+    // 使用Elasticsearch查询进行更精确的中文搜索
     @Query("{\"match\": {\"name\": {\"query\": \"?0\", \"analyzer\": \"ik_smart\"}}}")
     List<Product> searchByNameWithAnalyzer(String name);
 
-    // 新增：模糊搜索，支持部分匹配
+    // 模糊搜索，支持部分匹配
     @Query("{\"wildcard\": {\"name\": {\"value\": \"*?0*\"}}}")
     List<Product> searchByNameWildcard(String name);
 
-    // 新增：多字段搜索
+    // 多字段搜索
     @Query("{\"multi_match\": {\"query\": \"?0\", \"fields\": [\"name^2\", \"description\", \"specifications\"], \"analyzer\": \"ik_smart\"}}")
     List<Product> searchByMultipleFields(String keyword);
 
-    // 新增：OR逻辑多关键词搜索
+    // OR逻辑多关键词搜索
     @Query("{\"bool\": {\"should\": [{\"multi_match\": {\"query\": \"?0\", \"fields\": [\"name^2\", \"description\", \"specifications\"], \"analyzer\": \"ik_smart\"}}]}}")
     List<Product> searchByOrLogic(String keywords);
 
-    // 新增：AND逻辑多关键词搜索
+    // AND逻辑多关键词搜索
     @Query("{\"bool\": {\"must\": [{\"multi_match\": {\"query\": \"?0\", \"fields\": [\"name^2\", \"description\", \"specifications\"], \"analyzer\": \"ik_smart\"}}]}}")
     List<Product> searchByAndLogic(String keywords);
 
