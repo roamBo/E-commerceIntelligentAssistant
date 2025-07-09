@@ -22,7 +22,19 @@ if (localStorage.getItem('loginUser')) {
 
 const handleSidebarChange = (page) => {
   console.log('App: Changing page to', page)
+  if (!page) {
+    console.error('App: Invalid page name received:', page)
+    return
+  }
+  // 确保页面名称有效
+  const validPages = ['home', 'order', 'guide', 'payment', 'login']
+  if (!validPages.includes(page)) {
+    console.error('App: Unknown page name:', page)
+    return
+  }
+  // 设置当前页面
   currentPage.value = page
+  console.log('App: Current page set to', currentPage.value)
 }
 const handleSidebarLogin = () => {
   currentPage.value = 'login'
@@ -52,7 +64,7 @@ const handleGoLogin = () => {
     <main class="main-content">
       <LoginPage v-if="currentPage === 'login' && !loginUser" @login="onLogin" @showUser="onShowUser" />
       <UserInfo v-if="currentPage === 'login' && loginUser" :user="loginUser" @logout="onLogout" />
-      <HomePage v-if="currentPage === 'home'" />
+      <HomePage v-if="currentPage === 'home'" @change="handleSidebarChange" />
       <OrderManager v-if="currentPage === 'order'" @goLogin="handleGoLogin" />
       <ShoppingGuide v-if="currentPage === 'guide'" @goLogin="handleGoLogin" />
       <PaymentSystem v-if="currentPage === 'payment'" @change="handleSidebarChange" />

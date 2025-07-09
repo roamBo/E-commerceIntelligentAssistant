@@ -56,7 +56,7 @@
       </div>
       
       <div class="feature-cards">
-        <div class="feature-card fly-in-bottom" :class="{ 'in-view': inView }" ref="orderCard" @click="$emit('change', 'order')">
+        <div class="feature-card fly-in-bottom" :class="{ 'in-view': inView }" ref="orderCard" @click.prevent="navigateTo('order', $event)">
           <div class="card-highlight"></div>
           <div class="feature-icon">
             <span class="emoji-icon">🛒</span>
@@ -68,10 +68,10 @@
             <li><i class="el-icon-check"></i> 自动分类管理</li>
           </ul>
           <div class="feature-action">
-            <el-button type="primary" class="action-button" @click.stop="$emit('change', 'order')">立即查询</el-button>
+            <el-button type="primary" class="action-button" @click.stop.prevent="navigateTo('order', $event)">立即查询</el-button>
           </div>
         </div>
-        <div class="feature-card fly-in-bottom" :class="{ 'in-view': inView }" ref="guideCard" @click="$emit('change', 'guide')">
+        <div class="feature-card fly-in-bottom" :class="{ 'in-view': inView }" ref="guideCard" @click.prevent="navigateTo('guide', $event)">
           <div class="card-highlight"></div>
           <div class="feature-icon">
             <span class="emoji-icon">🤖</span>
@@ -83,7 +83,7 @@
             <li><i class="el-icon-check"></i> 精准营销方案</li>
           </ul>
           <div class="feature-action">
-            <el-button type="primary" class="action-button" @click.stop="$emit('change', 'guide')">立即使用</el-button>
+            <el-button type="primary" class="action-button" @click.stop.prevent="navigateTo('guide', $event)">立即使用</el-button>
           </div>
         </div>
       </div>
@@ -143,6 +143,20 @@ const solution1 = ref(null);
 const solution2 = ref(null);
 const solution3 = ref(null);
 const solution4 = ref(null);
+
+// 导航到指定页面
+const navigateTo = (page, e) => {
+  console.log('HomePage: Navigating to', page);
+  // 阻止事件冒泡，防止多次触发
+  if (e) {
+    e.stopPropagation();
+    e.preventDefault();
+  }
+  // 添加延时以确保事件不会被覆盖或丢失
+  setTimeout(() => {
+    emits('change', page);
+  }, 10);
+};
 
 onMounted(() => {
   // 功能卡片的观察器

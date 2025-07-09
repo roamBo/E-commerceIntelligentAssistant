@@ -77,7 +77,7 @@
         </div>
         <div class="buttons">
           <button class="action-button" @click="viewOrderDetails">查看订单详情</button>
-          <button class="action-button primary" @click="goBack">返回首页</button>
+          <button class="action-button primary" @click.prevent="goBack">返回首页</button>
         </div>
       </div>
     </div>
@@ -133,7 +133,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, defineEmits, onMounted, onBeforeUnmount } from 'vue';
+import { ref, reactive, onMounted, onBeforeUnmount } from 'vue';
 
 // 定义事件
 const emit = defineEmits(['change']);
@@ -271,7 +271,10 @@ const closeModal = () => {
 const goBack = () => {
   // 发射事件通知父组件切换到首页
   console.log('PaymentSystem: Emitting change event to navigate to home page');
-  emit('change', 'home');
+  // 添加延时以确保事件不会被覆盖或丢失
+  setTimeout(() => {
+    emit('change', 'home');
+  }, 10);
 };
 
 const bgCanvas = ref(null)
