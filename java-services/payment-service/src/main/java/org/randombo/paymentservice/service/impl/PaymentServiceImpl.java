@@ -1,10 +1,5 @@
 package org.randombo.paymentservice.service.impl;
 
-import com.alipay.api.AlipayApiException;
-import com.alipay.api.AlipayClient;
-import com.alipay.api.AlipayConfig;
-import com.alipay.api.DefaultAlipayClient;
-import com.alipay.api.request.AlipayTradePagePayRequest;
 import org.randombo.paymentservice.model.Payment;
 import org.randombo.paymentservice.repository.PaymentRepository;
 import org.randombo.paymentservice.service.PaymentService;
@@ -17,7 +12,6 @@ import java.util.List;
 @Service
 public class PaymentServiceImpl implements PaymentService {
     private final PaymentRepository paymentRepository;
-
 
 
     @Autowired
@@ -66,6 +60,14 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     public Payment updatePaymentStatus(String id, String status) {
+        // 定义合法的状态列表
+        List<String> validStatuses = List.of("PENDING", "SUCCESS", "FAILED");
+
+        // 验证传入的状态是否合法
+        if (!validStatuses.contains(status)) {
+            throw new IllegalArgumentException("Invalid payment status: " + status);
+        }
+
         return paymentRepository.findById(id)
                 .map(payment -> {
                     payment.setStatus(status);
