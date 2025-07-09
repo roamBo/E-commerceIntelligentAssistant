@@ -2,39 +2,42 @@ package org.randombo.orderservice.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
-
 import java.time.LocalDateTime;
 import java.util.List;
+import jakarta.validation.constraints.Min;
 
-@Entity // XXXX 标识这是一个JPA实体
-@Table(name = "orders") // XXXX 映射到名为 'orders' 的数据库表
+@Entity
+@Table(name = "orders")
 @Data
 public class Order {
 
-    @Id // XXXX 标识为主键
-    @GeneratedValue(strategy = GenerationType.IDENTITY) // XXXX 数据库自增主键
-    private Long id; // XXXX 数据库通常使用Long作为自增主增主键
-    private String orderId; // 保持业务订单ID
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String orderId;
     private Long userId;
-    private Double totalAmount;
+    @Min(0) // XXXX totalAmount 不能为负数 (已存在，确认)
+    private Double totalAmount; // 此字段将由商品价格总和计算得到
     private LocalDateTime orderTime;
     private String status;
     private String shippingAddress;
 
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true) // XXXX 一对多关系，级联操作，孤儿移除
-    @JoinColumn(name = "order_id_fk") // XXXX 在order_items表中添加外键列order_id_fk指向orders表的id
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+    @JoinColumn(name = "order_id_fk")
     private List<OrderItem> items;
 
-    @Entity // XXXX OrderItem也是一个JPA实体
-    @Table(name = "order_items") // XXXX 映射到名为 'order_items' 的数据库表
+    @Entity
+    @Table(name = "order_items")
     @Data
     public static class OrderItem {
-        @Id // XXXX 标识为主键
-        @GeneratedValue(strategy = GenerationType.IDENTITY) // XXXX 数据库自增主键
-        private Long id; // XXXX OrderItem自己的主键
+        @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
+        private Long id;
         private String productId;
         private String productName;
+        @Min(0) // 数量不能为负数
         private Integer quantity;
+        @Min(0) // 单价不能为负数
         private Double unitPrice;
 
         public OrderItem() {}
@@ -44,16 +47,29 @@ public class Order {
             this.quantity = quantity;
             this.unitPrice = unitPrice;
         }
+
+        public Double calculateItemTotal() {
+            return this.quantity * this.unitPrice;
+        }
     }
 
     public Order() {}
-    public Order(String orderId, Long userId, Double totalAmount, LocalDateTime orderTime, String status, String shippingAddress, List<OrderItem> items) {
+    // XXXX 修正：构造函数不再接收 totalAmount 参数，它将由items计算得到
+    public Order(String orderId, Long userId, LocalDateTime orderTime, String status, String shippingAddress, List<OrderItem> items) {
         this.orderId = orderId;
         this.userId = userId;
-        this.totalAmount = totalAmount;
         this.orderTime = orderTime;
         this.status = status;
         this.shippingAddress = shippingAddress;
         this.items = items;
+    }
+
+    public Double calculateTotalAmount() {
+        if (this.items == null || this.items.isEmpty()) {
+            return 0.0;
+        }
+        return this.items.stream()
+                .mapToDouble(OrderItem::calculateItemTotal) // 使用 OrderItem 的 calculateItemTotal 方法
+                .sum();
     }
 }
