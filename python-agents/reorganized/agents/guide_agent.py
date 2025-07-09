@@ -8,6 +8,8 @@ from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain.memory import ConversationBufferWindowMemory
 from langchain_community.chat_message_histories import RedisChatMessageHistory
 
+import sys
+sys.path.append("..")
 from config import Config
 from tools import search_products, format_final_response  # 导入工具
 
