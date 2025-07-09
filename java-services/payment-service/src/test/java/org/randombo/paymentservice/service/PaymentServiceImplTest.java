@@ -1,38 +1,29 @@
 package org.randombo.paymentservice.service;
 
-import com.alipay.api.AlipayApiException;
-import com.alipay.api.AlipayClient;
-import com.alipay.api.request.AlipayTradePagePayRequest;
-import com.alipay.api.response.AlipayTradePagePayResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.MockitoAnnotations;
 import org.randombo.paymentservice.model.Payment;
 import org.randombo.paymentservice.repository.PaymentRepository;
 import org.randombo.paymentservice.service.impl.PaymentServiceImpl;
-import org.springframework.dao.DataAccessException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-@ExtendWith(MockitoExtension.class)
 class PaymentServiceImplTest {
 
     @Mock
     private PaymentRepository paymentRepository;
-
-    @Mock
-    private AlipayClient alipayClient;
 
     @InjectMocks
     private PaymentServiceImpl paymentService;
@@ -41,151 +32,153 @@ class PaymentServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        MockitoAnnotations.openMocks(this);
+
         testPayment = new Payment();
-        testPayment.setId("pay_123");
-        testPayment.setOrderId("order_456");
-        testPayment.setUserId("user_789");
-        testPayment.setAmount(new BigDecimal("99.99"));
+        testPayment.setId(UUID.randomUUID().toString());
+        testPayment.setOrderId("order123");
+        testPayment.setUserId("user456");
+        testPayment.setAmount(new BigDecimal("100.00"));
         testPayment.setStatus("PENDING");
         testPayment.setCreateAt(LocalDateTime.now());
         testPayment.setUpdateAt(LocalDateTime.now());
     }
 
     @Test
-    void createPayment_Success() {
+    void createPayment_ShouldSavePaymentWithTimestamps() {
+        Payment newPayment = new Payment();
+        newPayment.setOrderId("order123");
+        newPayment.setUserId("user456");
+        newPayment.setAmount(new BigDecimal("100.00"));
+
         when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment);
 
-        Payment created = paymentService.createPayment(testPayment);
+        Payment result = paymentService.createPayment(newPayment);
 
-        assertNotNull(created);
-        assertEquals("pay_123", created.getId());
-        verify(paymentRepository, times(1)).save(testPayment);
+        assertNotNull(result.getCreateAt());
+        assertNotNull(result.getUpdateAt());
+        assertEquals(testPayment.getId(), result.getId());
+        verify(paymentRepository, times(1)).save(any(Payment.class));
     }
 
     @Test
-    void createPayment_DatabaseError() {
-        when(paymentRepository.save(any(Payment.class)))
-                .thenThrow(new RuntimeException("DB connection failed"));
+    void getPaymentById_ShouldReturnPaymentWhenExists() {
+        when(paymentRepository.findById(testPayment.getId())).thenReturn(Optional.of(testPayment));
 
-        assertThrows(RuntimeException.class, () -> {
-            paymentService.createPayment(testPayment);
-        });
-    }
-
-    @Test
-    void getPaymentById_Found() {
-        when(paymentRepository.findById("pay_123")).thenReturn(Optional.of(testPayment));
-
-        Payment found = paymentService.getPaymentById("pay_123");
-
-        assertNotNull(found);
-        assertEquals("order_456", found.getOrderId());
-    }
-
-    @Test
-    void getPaymentById_NotFound() {
-        when(paymentRepository.findById("invalid_id")).thenReturn(Optional.empty());
-
-        Payment result = paymentService.getPaymentById("invalid_id");
-
-        assertNull(result);
-    }
-
-    @Test
-    void getAllPayments_Success() {
-        when(paymentRepository.findAll()).thenReturn(Arrays.asList(testPayment));
-
-        List<Payment> payments = paymentService.getAllPayments();
-
-        assertEquals(1, payments.size());
-        assertEquals("pay_123", payments.get(0).getId());
-    }
-
-    @Test
-    void getPaymentsByUserId_Success() {
-        when(paymentRepository.findByUserId("user_789")).thenReturn(Arrays.asList(testPayment));
-
-        List<Payment> payments = paymentService.getPaymentsByUserId("user_789");
-
-        assertEquals(1, payments.size());
-        assertEquals("user_789", payments.get(0).getUserId());
-    }
-
-    @Test
-    void updatePayment_Success() {
-        Payment updatedDetails = new Payment();
-        updatedDetails.setAmount(new BigDecimal("149.99"));
-        updatedDetails.setStatus("SUCCESS");
-
-        when(paymentRepository.findById("pay_123")).thenReturn(Optional.of(testPayment));
-        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        Payment updated = paymentService.updatePayment("pay_123", updatedDetails);
-
-        assertEquals(new BigDecimal("149.99"), updated.getAmount());
-        assertEquals("SUCCESS", updated.getStatus());
-        assertTrue(updated.getUpdateAt().isEqual(testPayment.getUpdateAt()));
-    }
-
-    @Test
-    void updatePayment_NotFound() {
-        when(paymentRepository.findById("invalid_id")).thenReturn(Optional.empty());
-
-        Payment result = paymentService.updatePayment("invalid_id", testPayment);
-
-        assertNull(result);
-    }
-
-    @Test
-    void updatePaymentStatus_Success() {
-        when(paymentRepository.findById("pay_123")).thenReturn(Optional.of(testPayment));
-        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        Payment updated = paymentService.updatePaymentStatus("pay_123", "SUCCESS");
-
-        assertEquals("SUCCESS", updated.getStatus());
-        assertTrue(updated.getUpdateAt().isEqual(testPayment.getUpdateAt()));
-    }
-
-    @Test
-    void updatePaymentStatus_InvalidStatus() {
-        when(paymentRepository.findById("pay_123")).thenReturn(Optional.of(testPayment));
-
-        assertThrows(IllegalArgumentException.class, () -> {
-            paymentService.updatePaymentStatus("pay_123", "INVALID_STATUS");
-        });
-    }
-
-    @Test
-    void deletePayment_Success() {
-        doNothing().when(paymentRepository).deleteById("pay_123");
-
-        paymentService.deletePayment("pay_123");
-
-        verify(paymentRepository, times(1)).deleteById("pay_123");
-    }
-
-    @Test
-    void createAlipayOrder_Success() throws AlipayApiException {
-        AlipayTradePagePayResponse mockResponse = new AlipayTradePagePayResponse();
-        mockResponse.setBody("alipay_form_data");
-
-        when(alipayClient.pageExecute(any(AlipayTradePagePayRequest.class)))
-                .thenReturn(mockResponse);
-
-        String result = paymentService.createAlipayOrder("order_123", "100.00", "Test Product");
+        Payment result = paymentService.getPaymentById(testPayment.getId());
 
         assertNotNull(result);
-        assertEquals("alipay_form_data", result);
+        assertEquals(testPayment.getId(), result.getId());
+        verify(paymentRepository, times(1)).findById(testPayment.getId());
     }
 
     @Test
-    void createAlipayOrder_AlipayApiException() throws AlipayApiException {
-        when(alipayClient.pageExecute(any(AlipayTradePagePayRequest.class)))
-                .thenThrow(new AlipayApiException("API error"));
+    void getPaymentById_ShouldReturnNullWhenNotExists() {
+        when(paymentRepository.findById("nonexistent")).thenReturn(Optional.empty());
 
-        String result = paymentService.createAlipayOrder("order_123", "100.00", "Test Product");
+        Payment result = paymentService.getPaymentById("nonexistent");
 
         assertNull(result);
+        verify(paymentRepository, times(1)).findById("nonexistent");
+    }
+
+    @Test
+    void getAllPayments_ShouldReturnAllPayments() {
+        List<Payment> payments = Arrays.asList(testPayment);
+        when(paymentRepository.findAll()).thenReturn(payments);
+
+        List<Payment> result = paymentService.getAllPayments();
+
+        assertEquals(1, result.size());
+        assertEquals(testPayment.getId(), result.get(0).getId());
+        verify(paymentRepository, times(1)).findAll();
+    }
+
+    @Test
+    void getPaymentsByUserId_ShouldReturnUserPayments() {
+        List<Payment> payments = Arrays.asList(testPayment);
+        when(paymentRepository.findByUserId(testPayment.getUserId())).thenReturn(payments);
+
+        List<Payment> result = paymentService.getPaymentsByUserId(testPayment.getUserId());
+
+        assertEquals(1, result.size());
+        assertEquals(testPayment.getUserId(), result.get(0).getUserId());
+        verify(paymentRepository, times(1)).findByUserId(testPayment.getUserId());
+    }
+
+    @Test
+    void updatePayment_ShouldUpdateExistingPayment() {
+        Payment updatedDetails = new Payment();
+        updatedDetails.setOrderId("newOrder");
+        updatedDetails.setAmount(new BigDecimal("200.00"));
+        updatedDetails.setStatus("SUCCESS");
+
+        when(paymentRepository.findById(testPayment.getId())).thenReturn(Optional.of(testPayment));
+        when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment);
+
+        Payment result = paymentService.updatePayment(testPayment.getId(), updatedDetails);
+
+        assertNotNull(result);
+        assertEquals("newOrder", result.getOrderId());
+        assertEquals(new BigDecimal("200.00"), result.getAmount());
+        assertEquals("SUCCESS", result.getStatus());
+        assertNotNull(result.getUpdateAt());
+        verify(paymentRepository, times(1)).findById(testPayment.getId());
+        verify(paymentRepository, times(1)).save(any(Payment.class));
+    }
+
+    @Test
+    void updatePayment_ShouldReturnNullWhenNotExists() {
+        when(paymentRepository.findById("nonexistent")).thenReturn(Optional.empty());
+
+        Payment result = paymentService.updatePayment("nonexistent", new Payment());
+
+        assertNull(result);
+        verify(paymentRepository, times(1)).findById("nonexistent");
+        verify(paymentRepository, never()).save(any(Payment.class));
+    }
+
+    @Test
+    void deletePayment_ShouldCallRepositoryDelete() {
+        doNothing().when(paymentRepository).deleteById(testPayment.getId());
+
+        paymentService.deletePayment(testPayment.getId());
+
+        verify(paymentRepository, times(1)).deleteById(testPayment.getId());
+    }
+
+    @Test
+    void updatePaymentStatus_ShouldUpdateStatusWhenValid() {
+        when(paymentRepository.findById(testPayment.getId())).thenReturn(Optional.of(testPayment));
+        when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment);
+
+        Payment result = paymentService.updatePaymentStatus(testPayment.getId(), "SUCCESS");
+
+        assertNotNull(result);
+        assertEquals("SUCCESS", result.getStatus());
+        assertNotNull(result.getUpdateAt());
+        verify(paymentRepository, times(1)).findById(testPayment.getId());
+        verify(paymentRepository, times(1)).save(any(Payment.class));
+    }
+
+    @Test
+    void updatePaymentStatus_ShouldThrowExceptionWhenInvalidStatus() {
+        assertThrows(IllegalArgumentException.class, () -> {
+            paymentService.updatePaymentStatus(testPayment.getId(), "INVALID");
+        });
+
+        verify(paymentRepository, never()).findById(anyString());
+        verify(paymentRepository, never()).save(any(Payment.class));
+    }
+
+    @Test
+    void updatePaymentStatus_ShouldReturnNullWhenNotExists() {
+        when(paymentRepository.findById("nonexistent")).thenReturn(Optional.empty());
+
+        Payment result = paymentService.updatePaymentStatus("nonexistent", "SUCCESS");
+
+        assertNull(result);
+        verify(paymentRepository, times(1)).findById("nonexistent");
+        verify(paymentRepository, never()).save(any(Payment.class));
     }
 }

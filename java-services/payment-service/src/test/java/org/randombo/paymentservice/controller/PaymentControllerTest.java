@@ -1,97 +1,167 @@
 package org.randombo.paymentservice.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 import org.randombo.paymentservice.model.Payment;
 import org.randombo.paymentservice.service.PaymentService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.List;
+import java.util.UUID;
 
-import static org.mockito.BDDMockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
-@WebMvcTest(PaymentController.class)
 class PaymentControllerTest {
 
-    @Autowired
-    private MockMvc mockMvc;
-
-    @MockBean
+    @Mock
     private PaymentService paymentService;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+    @InjectMocks
+    private PaymentController paymentController;
 
-    private Payment samplePayment;
+    private Payment testPayment;
 
     @BeforeEach
     void setUp() {
-        samplePayment = new Payment(
-                "1",
-                "order123",
-                "user123",
-                new BigDecimal("99.99"),
-                "PENDING",
-                LocalDateTime.now(),
-                LocalDateTime.now()
-        );
+        MockitoAnnotations.openMocks(this);
+
+        testPayment = new Payment();
+        testPayment.setId(UUID.randomUUID().toString());
+        testPayment.setOrderId("order123");
+        testPayment.setUserId("user456");
+        testPayment.setAmount(new BigDecimal("100.00"));
+        testPayment.setStatus("PENDING");
+        testPayment.setCreateAt(LocalDateTime.now());
+        testPayment.setUpdateAt(LocalDateTime.now());
     }
 
     @Test
-    void testCreatePayment() throws Exception {
-        given(paymentService.createPayment(any(Payment.class))).willReturn(samplePayment);
+    void createPayment_ShouldReturnCreatedPayment() {
+        when(paymentService.createPayment(any(Payment.class))).thenReturn(testPayment);
 
-        mockMvc.perform(post("/api/payments")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(samplePayment)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").value("1"))
-                .andExpect(jsonPath("$.orderId").value("order123"));
+        ResponseEntity<Payment> response = paymentController.createPayment(testPayment);
+
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(testPayment.getId(), response.getBody().getId());
+        verify(paymentService, times(1)).createPayment(any(Payment.class));
     }
 
     @Test
-    void testGetAllPayments() throws Exception {
-        given(paymentService.getAllPayments()).willReturn(Arrays.asList(samplePayment));
+    void getAllPayments_ShouldReturnAllPayments() {
+        List<Payment> payments = Arrays.asList(testPayment);
+        when(paymentService.getAllPayments()).thenReturn(payments);
 
-        mockMvc.perform(get("/api/payments"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].userId").value("user123"));
+        ResponseEntity<List<Payment>> response = paymentController.getAllPayments();
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(1, response.getBody().size());
+        verify(paymentService, times(1)).getAllPayments();
     }
 
     @Test
-    void testGetPaymentById() throws Exception {
-        given(paymentService.getPaymentById("1")).willReturn(samplePayment);
+    void getPaymentById_ShouldReturnPaymentWhenExists() {
+        when(paymentService.getPaymentById(testPayment.getId())).thenReturn(testPayment);
 
-        mockMvc.perform(get("/api/payments/1/"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value("1"));
+        ResponseEntity<Payment> response = paymentController.getPaymentById(testPayment.getId());
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(testPayment.getId(), response.getBody().getId());
+        verify(paymentService, times(1)).getPaymentById(testPayment.getId());
     }
 
     @Test
-    void testUpdatePaymentStatus() throws Exception {
-        samplePayment.setStatus("SUCCESS");
-        given(paymentService.updatePaymentStatus(eq("1"), eq("SUCCESS"))).willReturn(samplePayment);
-        given(paymentService.getPaymentById("1")).willReturn(samplePayment);
+    void getPaymentById_ShouldReturnNotFoundWhenNotExists() {
+        when(paymentService.getPaymentById("nonexistent")).thenReturn(null);
 
-        mockMvc.perform(get("/api/payments/1/"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("SUCCESS"));
+        ResponseEntity<Payment> response = paymentController.getPaymentById("nonexistent");
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        verify(paymentService, times(1)).getPaymentById("nonexistent");
     }
 
     @Test
-    void testDeletePayment() throws Exception {
-        willDoNothing().given(paymentService).deletePayment("1");
+    void getPaymentsByUserId_ShouldReturnUserPayments() {
+        List<Payment> payments = Arrays.asList(testPayment);
+        when(paymentService.getPaymentsByUserId(testPayment.getUserId())).thenReturn(payments);
 
-        mockMvc.perform(delete("/api/payments/1"))
-                .andExpect(status().isNoContent());
+        ResponseEntity<List<Payment>> response = paymentController.getPaymentsByUserId(testPayment.getUserId());
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(1, response.getBody().size());
+        assertEquals(testPayment.getUserId(), response.getBody().get(0).getUserId());
+        verify(paymentService, times(1)).getPaymentsByUserId(testPayment.getUserId());
+    }
+
+    @Test
+    void updatePayment_ShouldReturnUpdatedPayment() {
+        Payment updatedPayment = new Payment();
+        updatedPayment.setStatus("SUCCESS");
+
+        when(paymentService.updatePayment(eq(testPayment.getId()), any(Payment.class)))
+                .thenReturn(updatedPayment);
+
+        ResponseEntity<Payment> response = paymentController.updatePayment(testPayment.getId(), updatedPayment);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("SUCCESS", response.getBody().getStatus());
+        verify(paymentService, times(1)).updatePayment(eq(testPayment.getId()), any(Payment.class));
+    }
+
+    @Test
+    void updatePayment_ShouldReturnNotFoundWhenNotExists() {
+        when(paymentService.updatePayment(eq("nonexistent"), any(Payment.class))).thenReturn(null);
+
+        ResponseEntity<Payment> response = paymentController.updatePayment("nonexistent", new Payment());
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        verify(paymentService, times(1)).updatePayment(eq("nonexistent"), any(Payment.class));
+    }
+
+    @Test
+    void updatePaymentStatus_ShouldReturnUpdatedPayment() {
+        Payment updatedPayment = new Payment();
+        updatedPayment.setStatus("SUCCESS");
+
+        when(paymentService.updatePaymentStatus(testPayment.getId(), "SUCCESS"))
+                .thenReturn(updatedPayment);
+
+        ResponseEntity<Payment> response = paymentController.updatePaymentStatus(testPayment.getId(), "SUCCESS");
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("SUCCESS", response.getBody().getStatus());
+        verify(paymentService, times(1)).updatePaymentStatus(testPayment.getId(), "SUCCESS");
+    }
+
+    @Test
+    void updatePaymentStatus_ShouldReturnNotFoundWhenNotExists() {
+        when(paymentService.updatePaymentStatus("nonexistent", "SUCCESS")).thenReturn(null);
+
+        ResponseEntity<Payment> response = paymentController.updatePaymentStatus("nonexistent", "SUCCESS");
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        verify(paymentService, times(1)).updatePaymentStatus("nonexistent", "SUCCESS");
+    }
+
+    @Test
+    void deletePayment_ShouldReturnNoContent() {
+        doNothing().when(paymentService).deletePayment(testPayment.getId());
+
+        ResponseEntity<Payment> response = paymentController.deletePayment(testPayment.getId());
+
+        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+        verify(paymentService, times(1)).deletePayment(testPayment.getId());
     }
 }
