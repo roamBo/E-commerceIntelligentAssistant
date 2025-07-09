@@ -1,59 +1,59 @@
 # supervisor_agent.py
+
 import logging
 from typing import Dict, Any, List, Optional, AsyncIterator
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
-from langchain.agents import AgentExecutor, create_tool_calling_agent, Tool
+from langchain.agents import AgentExecutor, create_tool_calling_agent
+# 【重要】确保这里导入的是 StructuredTool，而不是 Tool
+from langchain_core.tools import StructuredTool # 【修正】导入 StructuredTool
 from langchain.memory import ConversationBufferWindowMemory
 from langchain_community.chat_message_histories import RedisChatMessageHistory
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.base import BaseCheckpointSaver, Checkpoint, \
-    CheckpointTuple  # 导入 BaseCheckpointSaver 和 CheckpointTuple
-import redis  # 导入 redis 客户端
-import json  # 用于序列化/反序列化 Checkpoint (暂时保留，后面替换为 orjson)
-import asyncio  # 用于异步操作
-from datetime import datetime  # 用于时间戳
-import orjson  # 【新增】高性能 JSON 库
+    CheckpointTuple
+import redis
+import json
+import asyncio
+from datetime import datetime
+import orjson
 
 from config import Config
-from models import AgentState  # 导入自定义的 AgentState
+from models import AgentState
 from agents.guide_agent import get_guide_agent, GuideAgent
 from agents.order_agent import get_order_agent, OrderAgent
 from agents.payment_agent import get_payment_agent, PaymentAgent
+from models import ChatRequest # 确保 ChatRequest 被导入
 
 logger = logging.getLogger(__name__)
 
-
-# --- 自定义 Redis Checkpointer 实现 ---
+# --- 自定义 Redis Checkpointer 实现 (保持不变) ---
 class RedisCheckpointer(BaseCheckpointSaver):
+    # ... (这部分代码保持不变) ...
     def __init__(self, redis_url: str):
         try:
-            # 【修正】使用 redis.Redis.from_url 替代 redis.parse_url
             self.redis = redis.Redis.from_url(redis_url)
-            self.redis.ping()  # 测试连接
+            self.redis.ping()
             logger.info(f"✅ RedisCheckpointer: 成功连接到 Redis 服务器: {redis_url}")
         except redis.ConnectionError as e:
             logger.error(f"❌ RedisCheckpointer: 无法连接到 Redis 服务器: {redis_url}. 错误详情: {e}")
-            raise  # 无法连接则抛出异常，阻止应用启动
+            raise
         except Exception as e:
             logger.error(f"❌ RedisCheckpointer: 初始化失败: {e}")
             raise
 
     async def aget_tuple(self, config: Dict[str, Any]) -> Optional[CheckpointTuple]:
+        # ... (这部分代码保持不变) ...
         thread_id = config["configurable"]["thread_id"]
         key = f"langgraph:checkpoint:{thread_id}"
-
         try:
             data = await asyncio.to_thread(self.redis.get, key)
             if data:
-                # 【修正】使用 orjson.loads
                 checkpoint_data = orjson.loads(data)
-
                 checkpoint = checkpoint_data.get("checkpoint")
                 metadata = checkpoint_data.get("metadata", {})
                 parent_ts = checkpoint_data.get("parent_ts")
-
                 if checkpoint:
                     return CheckpointTuple(
                         config=config,
@@ -68,56 +68,42 @@ class RedisCheckpointer(BaseCheckpointSaver):
 
     async def aput_tuple(self, config: Dict[str, Any], checkpoint: Checkpoint, metadata: Dict[str, Any],
                          parent_ts: Optional[str]) -> str:
+        # ... (这部分代码保持不变) ...
         thread_id = config["configurable"]["thread_id"]
         key = f"langgraph:checkpoint:{thread_id}"
-
         try:
-            # 示例：将 BaseMessage 转换为字典 (如果 Checkpoint 包含 BaseMessage)
             def serialize_message(msg):
                 if isinstance(msg, BaseMessage):
                     return {"type": msg.type, "content": msg.content}
                 return msg
-
-            # 递归地将 Checkpoint 中的所有 BaseMessage 转换为字典
-            # 【修正】使用 orjson.dumps
             serialized_checkpoint = orjson.loads(orjson.dumps(checkpoint, default=serialize_message))
-
-            # 存储完整的 CheckpointTuple 信息
             data_to_store = {
                 "checkpoint": serialized_checkpoint,
                 "metadata": metadata,
                 "parent_ts": parent_ts,
-                "timestamp": datetime.now().isoformat()  # 添加时间戳
+                "timestamp": datetime.now().isoformat()
             }
-
-            # 【修正】使用 orjson.dumps 和设置过期时间
-            await asyncio.to_thread(self.redis.set, key, orjson.dumps(data_to_store), ex=3600)  # 设置1小时过期时间
-
-            # 返回当前检查点的时间戳作为版本标识
+            await asyncio.to_thread(self.redis.set, key, orjson.dumps(data_to_store), ex=3600)
             return data_to_store["timestamp"]
         except Exception as e:
             logger.error(f"RedisCheckpointer: 保存检查点失败 for {thread_id}: {e}")
-            raise  # 抛出异常，让上层捕获处理
+            raise
 
     async def alist(self, config: Dict[str, Any]) -> AsyncIterator[CheckpointTuple]:
-        # 这个方法通常用于列出所有检查点，对于简单应用可以不实现或简化
-        # 这里为了满足抽象基类的要求，简单实现
+        # ... (这部分代码保持不变) ...
         thread_id_prefix = "langgraph:checkpoint:"
         try:
             keys = await asyncio.to_thread(self.redis.keys, f"{thread_id_prefix}*")
             for key in keys:
                 thread_id = key.decode('utf-8').replace(thread_id_prefix, '')
-                # 重新调用 aget_tuple 获取完整数据
                 tuple_data = await self.aget_tuple({"configurable": {"thread_id": thread_id}})
                 if tuple_data:
                     yield tuple_data
         except Exception as e:
             logger.error(f"RedisCheckpointer: 列出检查点失败: {e}")
-            # 可以选择不抛出，或者抛出更具体的异常
 
 
 # --- 1. 定义监管者 Agent 的工具 ---
-# ... (这部分代码与之前相同，无需修改) ...
 class SupervisorTools:
     def __init__(self, guide_agent: GuideAgent, order_agent: OrderAgent, payment_agent: PaymentAgent):
         self.guide_agent = guide_agent
@@ -127,46 +113,51 @@ class SupervisorTools:
     def get_tools(self):
         return [
             # 商品推荐 Agent 工具
-            Tool(
+            StructuredTool.from_function( # 【修正】使用 StructuredTool.from_function
                 name="guide_agent_process_message",
-                # 【修正】只从 kwargs 中获取参数，因为 create_tool_calling_agent 总是以关键字参数传递
-                func=lambda *args, **kwargs: asyncio.run(self.guide_agent.process_message(
-                    kwargs['user_input'],  # 假设 user_input 总是存在
-                    kwargs['session_id']  # 假设 session_id 总是存在
-                )),
+                func=lambda **kwargs: asyncio.run( # 【修正】func 接收 **kwargs
+                    self.guide_agent.process_message(
+                        kwargs.get('user_input'), # 使用 .get() 确保健壮性
+                        kwargs.get('session_id')
+                    )
+                ),
+                args_schema=ChatRequest, # 保持 args_schema 不变
                 description="""当用户需要商品推荐、商品信息查询、产品对比等购物辅助信息时使用。
-                            输入参数: user_input (str), session_id (str)。
-                            返回商品推荐报告或相关购物信息。"""
+                                输入参数: 一个包含 'user_input' (str) 和 'session_id' (str) 的 JSON 对象。
+                                返回商品推荐报告或相关购物信息。"""
             ),
             # 订单管理 Agent 工具
-            Tool(
+            StructuredTool.from_function( # 【修正】使用 StructuredTool.from_function
                 name="order_agent_process_message",
-                # 【修正】同上
-                func=lambda *args, **kwargs: asyncio.run(self.order_agent.process_message(
-                    kwargs['user_input'],
-                    kwargs['session_id']
-                )),
+                func=lambda **kwargs: asyncio.run( # 【修正】func 接收 **kwargs
+                    self.order_agent.process_message(
+                        kwargs.get('user_input'),
+                        kwargs.get('session_id')
+                    )
+                ),
+                args_schema=ChatRequest, # 保持 args_schema 不变
                 description="""当用户需要查询订单状态、物流信息、创建订单、修改订单、取消订单、申请退款等订单相关操作时使用。
-                            输入参数: user_input (str), session_id (str)。
-                            返回订单处理结果或相关订单信息。"""
+                                输入参数: 一个包含 'user_input' (str) 和 'session_id' (str) 的 JSON 对象。
+                                返回订单处理结果或相关订单信息。"""
             ),
             # 支付管理 Agent 工具
-            Tool(
+            StructuredTool.from_function( # 【修正】使用 StructuredTool.from_function
                 name="payment_agent_process_message",
-                # 【修正】同上
-                func=lambda *args, **kwargs: asyncio.run(self.payment_agent.process_message(
-                    kwargs['user_input'],
-                    kwargs['session_id']
-                )),
+                func=lambda **kwargs: asyncio.run( # 【修正】func 接收 **kwargs
+                    self.payment_agent.process_message(
+                        kwargs.get('user_input'),
+                        kwargs.get('session_id')
+                    )
+                ),
+                args_schema=ChatRequest, # 保持 args_schema 不变
                 description="""当用户需要进行支付、查询支付状态、处理退款（支付层面）等支付相关操作时使用。
-                            输入参数: user_input (str), session_id (str)。
-                            返回支付处理结果或相关支付信息。"""
+                                输入参数: 一个包含 'user_input' (str) 和 'session_id' (str) 的 JSON 对象。
+                                返回支付处理结果或相关支付信息。"""
             ),
         ]
 
 
 # --- 2. 定义监管者 Agent ---
-# ... (这部分代码与之前相同，无需修改) ...
 class SupervisorAgent:
     def __init__(self, guide_agent: GuideAgent, order_agent: OrderAgent, payment_agent: PaymentAgent):
         self.llm = ChatOpenAI(
@@ -178,16 +169,27 @@ class SupervisorAgent:
         self.supervisor_tools = SupervisorTools(guide_agent, order_agent, payment_agent).get_tools()
 
         self.prompt = ChatPromptTemplate.from_messages([
-            ("system", """你是一个高级智能助手，负责理解用户意图并将请求路由到最合适的子代理。
-            你有以下子代理可用：
-            - `guide_agent_process_message`: 处理商品推荐和购物辅助。
-            - `order_agent_process_message`: 处理订单查询和管理。
-            - `payment_agent_process_message`: 处理支付和退款。
+            ("system", """你是一个高级智能助手，负责根据用户请求将任务路由给合适的子代理。
+                子代理包括：
+                - guide_agent_process_message: 处理商品推荐、购物辅助等。
+                - order_agent_process_message: 处理订单查询、创建、修改、取消等。
+                - payment_agent_process_message: 处理支付、退款、支付状态查询等。
 
-            根据用户的最新输入和对话历史，选择一个最合适的工具（子代理）来处理请求。
-            如果用户的问题不属于任何一个子代理的范围，或者你需要更多信息才能决定，请直接回答用户并请求澄清。
-            你的目标是高效地将用户引导到正确的服务。
-            """),
+                当决定调用子代理时，你必须严格按照以下格式生成工具调用：
+                {{
+                  "tool_calls": [
+                    {{
+                      "name": "子代理工具名",
+                      "args": {{
+                        "user_input": "用户原始输入内容",
+                        "session_id": "当前会话ID"
+                      }}
+                    }}
+                  ]
+                }}
+                请确保 'args' 字段是一个JSON对象，并且 'user_input' 和 'session_id' 字段是必填的。
+                如果无法判断意图或没有合适的子代理，请直接回答用户。
+                """),
             MessagesPlaceholder(variable_name="chat_history"),  # 监管者 Agent 自己的记忆
             ("human", "{input}"),
             MessagesPlaceholder(variable_name="agent_scratchpad"),
@@ -241,25 +243,49 @@ class SupervisorAgent:
                 state["next_agent"] = "FINISH"
                 return state
             elif "tool_calls" in response:
-                # 如果是工具调用，说明监管者决定转发给某个子 Agent
-                tool_call = response["tool_calls"][0]  # 假设只调用一个工具
+                tool_call = response["tool_calls"][0]
                 tool_name = tool_call["name"]
-                tool_args = tool_call["args"]
+                raw_tool_args = tool_call["args"]  # 获取原始的 args 字段
 
-                logger.info(f"SupervisorAgent 决定路由到: {tool_name} with args: {tool_args}")
+                logger.debug(f"原始工具参数: {type(raw_tool_args)} - {raw_tool_args}")  # 增强日志
 
-                # 更新状态，指示下一个要执行的 Agent
+                tool_args_dict = {}
+                try:
+                    if isinstance(raw_tool_args, dict):
+                        # 已经是字典格式，直接使用
+                        tool_args_dict = raw_tool_args
+                    elif isinstance(raw_tool_args, str):
+                        # 尝试解析字符串格式的参数
+                        if raw_tool_args.startswith("{") and raw_tool_args.endswith("}"):
+                            # 1. JSON字符串格式
+                            tool_args_dict = json.loads(raw_tool_args)
+                        else:
+                            # 2. 键值对字符串格式: 'user_input=... session_id=...'
+                            params = {}
+                            for pair in raw_tool_args.split():  # 假设参数之间用空格分隔
+                                if '=' in pair:
+                                    key, value = pair.split('=', 1)
+                                    params[key.strip()] = value.strip()
+                            tool_args_dict = params
+                    else:
+                        raise ValueError(f"LLM 返回的工具参数类型未知: {type(raw_tool_args).__name__}")
+
+                    # 验证必要参数
+                    REQUIRED_PARAMS = ["user_input", "session_id"]
+                    if not all(key in tool_args_dict and tool_args_dict[key] is not None for key in REQUIRED_PARAMS):
+                        raise ValueError(f"缺少必要参数或参数值为None: {tool_args_dict}")
+
+                except Exception as e:
+                    logger.error(f"监管者 Agent 参数解析失败: {raw_tool_args} - 错误: {e}")
+                    state["agent_response"] = "系统内部错误：无法解析您的请求参数。请尝试更清晰地表达，或稍后再试。"
+                    state["next_agent"] = "FINISH"
+                    return state
+
+                # 使用解析后的参数
                 state["next_agent"] = tool_name
-                # 将子 Agent 的输入参数也更新到状态中，以便子 Agent 节点使用
-                # 注意：这里确保 user_input 和 session_id 传递给子 Agent
-                state["user_input"] = tool_args.get("user_input", user_input)
-                state["session_id"] = tool_args.get("session_id", session_id)
+                state["user_input"] = tool_args_dict["user_input"]
+                state["session_id"] = tool_args_dict["session_id"]
 
-                return state
-            else:
-                logger.warning(f"SupervisorAgent 未能生成有效决策: {response}")
-                state["agent_response"] = "抱歉，我暂时无法理解您的请求，请您详细描述一下。"
-                state["next_agent"] = "FINISH"
                 return state
 
         except Exception as e:
@@ -395,23 +421,25 @@ class MultiAgentWorkflow:
     def _wrap_agent_call(self, agent_method, output_key: str):
         """
         包装子 Agent 的 process_message 方法，使其能够更新 AgentState。
+        节点函数直接修改并返回 AgentState 对象。
         """
 
-        async def wrapped_call(state: AgentState) -> AgentState:
+        async def wrapped_call(state: AgentState) -> AgentState: # 【修正】返回类型改为 AgentState
             user_input = state["user_input"]
             session_id = state["session_id"]
 
             try:
                 # 调用子 Agent 的方法
                 result = await agent_method(user_input, session_id)
-                # 将子 Agent 的结果存储到 AgentState 的对应字段中
-                state[output_key] = result
+                # 直接修改 state 对象
+                setattr(state, output_key, result) # 【修正】直接修改 AgentState 对象的属性
                 # 确保返回更新后的状态
-                return state
+                return state # 【修正】返回修改后的 AgentState 对象
             except Exception as e:
                 logger.error(f"子 Agent 调用失败 ({agent_method.__name__}): {e}")
-                state["agent_response"] = f"抱歉，{agent_method.__name__} 在处理您的请求时发生错误: {e}"
-                state["next_agent"] = "FINISH"  # 强制结束流程
+                # 如果发生错误，直接修改 state 对象
+                state.agent_response = f"抱歉，{agent_method.__name__} 在处理您的请求时发生错误: {e}"
+                state.next_agent = "FINISH"  # 强制结束流程
                 return state
 
         return wrapped_call
@@ -419,6 +447,7 @@ class MultiAgentWorkflow:
 
 # 全局工作流实例
 multi_agent_workflow_instance: Optional[MultiAgentWorkflow] = None
+
 
 async def get_multi_agent_workflow() -> MultiAgentWorkflow:
     global multi_agent_workflow_instance

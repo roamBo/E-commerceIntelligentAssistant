@@ -8,7 +8,7 @@ load_dotenv() # 加载 .env 文件
 class Config:
     # LangChain LLM 配置
     LLM_MODEL_NAME: str = os.environ.get("LLM_MODEL_NAME", "deepseek-ai/DeepSeek-R1")
-    LLM_TEMPERATURE: float = float(os.environ.get("LLM_TEMPERATURE", 0.1))
+    LLM_TEMPERATURE: float = float(os.environ.get("LLM_TEMPERATURE", 0))
     SILICONFLOW_API_KEY: str = os.environ.get("SILICONFLOW_API_KEY")
     SILICONFLOW_API_BASE: str = os.environ.get("SILICONFLOW_API_BASE", "https://api.siliconflow.cn/v1" )
 
