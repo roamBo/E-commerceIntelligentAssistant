@@ -239,7 +239,7 @@ watch(() => props.currentPage, (newVal) => {
 .nav-item {
   position: relative;
   margin: 0 24px;
-  font-size: 1.3em;
+  font-size: 1.1em;
   color: rgba(255, 255, 255, 0.7);
   cursor: pointer;
   height: 64px;
