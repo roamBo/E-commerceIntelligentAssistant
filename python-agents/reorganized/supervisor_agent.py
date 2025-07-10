@@ -103,21 +103,13 @@ class SupervisorTools:
         self.payment_agent = payment_agent
 
     def get_tools(self):
-        # 定义异步包装函数
-        async def _guide_agent_process_message_wrapper(user_input: str, session_id: str) -> str:
-            return await self.guide_agent.process_message(user_input=user_input, session_id=session_id)
-
-        async def _order_agent_process_message_wrapper(user_input: str, session_id: str) -> str:
-            return await self.order_agent.process_message(user_input=user_input, session_id=session_id)
-
-        async def _payment_agent_process_message_wrapper(user_input: str, session_id: str) -> str:
-            return await self.payment_agent.process_message(user_input=user_input, session_id=session_id)
-
         return [
             StructuredTool.from_function(
                 name="guide_agent_process_message",
-                # 【关键修正】直接传递 async def 函数
-                func=_guide_agent_process_message_wrapper,
+                # 【关键修正】在 func 内部使用 asyncio.run 来同步执行异步方法
+                func=lambda user_input, session_id: asyncio.run(
+                    self.guide_agent.process_message(user_input=user_input, session_id=session_id)
+                ),
                 args_schema=ChatRequest,
                 description="""当用户需要商品推荐、商品信息查询、产品对比等购物辅助信息时使用。
                                 输入参数: 一个包含 'user_input' (str) 和 'session_id' (str) 的 JSON 对象。
@@ -125,8 +117,10 @@ class SupervisorTools:
             ),
             StructuredTool.from_function(
                 name="order_agent_process_message",
-                # 【关键修正】直接传递 async def 函数
-                func=_order_agent_process_message_wrapper,
+                # 【关键修正】在 func 内部使用 asyncio.run 来同步执行异步方法
+                func=lambda user_input, session_id: asyncio.run(
+                    self.order_agent.process_message(user_input=user_input, session_id=session_id)
+                ),
                 args_schema=ChatRequest,
                 description="""当用户需要查询订单状态、物流信息、创建订单、修改订单、取消订单、申请退款等订单相关操作时使用。
                                 输入参数: 一个包含 'user_input' (str) 和 'session_id' (str) 的 JSON 对象。
@@ -134,8 +128,10 @@ class SupervisorTools:
             ),
             StructuredTool.from_function(
                 name="payment_agent_process_message",
-                # 【关键修正】直接传递 async def 函数
-                func=_payment_agent_process_message_wrapper,
+                # 【关键修正】在 func 内部使用 asyncio.run 来同步执行异步方法
+                func=lambda user_input, session_id: asyncio.run(
+                    self.payment_agent.process_message(user_input=user_input, session_id=session_id)
+                ),
                 args_schema=ChatRequest,
                 description="""当用户需要进行支付、查询支付状态、处理退款（支付层面）等支付相关操作时使用。
                                 输入参数: 一个包含 'user_input' (str) 和 'session_id' (str) 的 JSON 对象。
