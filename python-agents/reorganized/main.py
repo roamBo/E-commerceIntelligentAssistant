@@ -101,10 +101,9 @@ async def chat_endpoint(request: ChatRequest):
     user_input = request.user_input
 
     try:
-        # 【修改】通过 get_multi_agent_workflow() 获取实例，并调用其 invoke_workflow 方法
         workflow = await get_multi_agent_workflow()
         final_response_text = await workflow.invoke_workflow(user_input, session_id)
-
+        print(f"DEBUG: chat_endpoint returning: {final_response_text}") # 添加日志
         return ChatResponse(response=final_response_text, session_id=session_id)
 
     except Exception as e:
