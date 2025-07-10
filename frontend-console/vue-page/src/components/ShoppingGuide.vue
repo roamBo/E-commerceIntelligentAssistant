@@ -340,22 +340,24 @@ function animateParticles() {
 </script>
 
 <style scoped>
-/* .particle-bg {
-  position: fixed;
-  left: 0;
-  top: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: 0;
-  pointer-events: none;
-} */
+html, body, #app {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
 .shopping-guide {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
   min-height: 100vh;
   width: 100vw;
-  position: relative;
   overflow: hidden;
   background: #f5f7fa;
+  padding-top: 0 !important;
+  margin-top: 0 !important;
 }
+
 .guide-content {
   position: relative;
   z-index: 1;
@@ -363,8 +365,10 @@ function animateParticles() {
   width: 100%;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
+  padding-top: 0 !important;
+  margin-top: 0 !important;
 }
 
 .chat-container {
@@ -383,6 +387,7 @@ function animateParticles() {
   z-index: 1;
   border: 1px solid #ebeef5;
   overflow: hidden;
+  top: 100px;
 }
 
 .chat-header {
@@ -751,7 +756,7 @@ function animateParticles() {
 .side-panel {
   position: absolute;
   right: 20px;
-  top: 100px;
+  top: 150px;
   display: flex;
   flex-direction: column;
   gap: 20px;

@@ -6,16 +6,7 @@
     </div>
     <template v-else>
       <div class="order-header">
-        <h2>订单智能管家</h2>
-        <div class="search-box">
-          <el-input
-            v-model="searchKeyword"
-            placeholder="搜索订单编号/商品名称"
-            prefix-icon="el-icon-search"
-            clearable
-          />
-          <el-button type="primary" class="search-btn" @click="handleSearch">搜索</el-button>
-        </div>
+        <!-- 標題與上方搜尋欄已移除 -->
       </div>
 
       <div class="filter-bar">
@@ -26,7 +17,6 @@
           <el-radio-button label="DELIVERED">已发货</el-radio-button>
           <el-radio-button label="FINISH">已完成</el-radio-button>
         </el-radio-group>
-        
         <div class="date-filter">
           <el-date-picker
             v-model="dateRange"
@@ -38,6 +28,15 @@
             value-format="YYYY-MM-DD"
             size="medium"
           />
+        </div>
+        <div class="search-box">
+          <el-input
+            v-model="searchKeyword"
+            placeholder="搜索订单编号/商品名称"
+            prefix-icon="el-icon-search"
+            clearable
+          />
+          <el-button type="primary" class="search-btn" @click="handleSearch">搜索</el-button>
         </div>
       </div>
       
@@ -386,6 +385,11 @@ const handleSearch = () => {
 </script>
 
 <style scoped>
+html, body, #app {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
 .user-id {
   color: #409EFF;
   font-weight: bold;
@@ -400,13 +404,16 @@ const handleSearch = () => {
 }
 
 .order-manager {
-  width: 100%;
-  height: 100%;
-  padding: 24px;
-  background: #f5f7fa;
-  display: flex;
-  flex-direction: column;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  min-height: 100vh;
+  width: 100vw;
   overflow-y: auto;
+  background: #f5f7fa;
+  padding-top: 0 !important;
+  margin-top: 0 !important;
 }
 
 .order-header {
@@ -417,9 +424,10 @@ const handleSearch = () => {
 }
 
 .order-header h2 {
-  font-size: 24px;
+  font-size: 40px;
   color: #303133;
   margin: 0;
+  margin-top: 100px;
 }
 
 .search-box {
@@ -431,15 +439,52 @@ const handleSearch = () => {
   width: 240px;
 }
 
+/* CSS 調整 filter-bar 內部排列 */
 .filter-bar {
   display: flex;
-  justify-content: space-between;
+  flex-direction: row;
   align-items: center;
+  justify-content: space-between;
+  gap: 24px;
   margin-bottom: 24px;
   background: #fff;
   padding: 16px;
   border-radius: 8px;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+  margin-top: 90px;
+}
+.filter-bar > .el-radio-group {
+  flex: 1 1 0;
+  min-width: 220px;
+  margin-right: 16px;
+}
+.date-filter {
+  flex: 1 1 0;
+  min-width: 240px;
+  margin: 0 16px;
+  display: flex;
+  justify-content: center;
+}
+.search-box {
+  flex: 1 1 0;
+  display: flex;
+  gap: 8px;
+  min-width: 320px;
+  margin-left: 16px;
+  justify-content: flex-end;
+}
+@media (max-width: 900px) {
+  .filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+  .filter-bar > .el-radio-group,
+  .date-filter, .search-box {
+    margin: 0;
+    min-width: 0;
+    justify-content: stretch;
+  }
 }
 
 .order-list {

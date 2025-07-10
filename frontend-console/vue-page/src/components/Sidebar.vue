@@ -1,7 +1,7 @@
 <template>
   <header class="top-navbar">
     <div 
-      class="logo-title" 
+      class="logo-title"
       :class="{ 'active': activeIndex === 'home' }"
       @click="handleLogoClick" 
       role="button"
@@ -10,15 +10,15 @@
         <svg width="38" height="38" viewBox="0 0 64 64">
           <circle cx="32" cy="32" r="28" stroke="url(#outerGradient)" stroke-width="4" fill="none" class="logo-ring-outer"/>
           <circle cx="32" cy="32" r="20" stroke="url(#innerGradient)" stroke-width="2.5" fill="none" class="logo-ring-inner"/>
-          <circle cx="32" cy="32" r="6" fill="#64ffda" class="logo-dot-pulse" filter="url(#glow)"/>
+          <circle cx="32" cy="32" r="6" fill="#00e6e6" class="logo-dot-pulse" filter="url(#glow)"/>
           <defs>
             <linearGradient id="outerGradient" x1="0" y1="0" x2="64" y2="64">
-              <stop offset="0%" stop-color="#64ffda"/>
+              <stop offset="0%" stop-color="#00e6e6"/>
               <stop offset="100%" stop-color="#1de9b6"/>
             </linearGradient>
             <linearGradient id="innerGradient" x1="64" y1="0" x2="0" y2="64">
               <stop offset="0%" stop-color="#fff"/>
-              <stop offset="100%" stop-color="#64ffda"/>
+              <stop offset="100%" stop-color="#00e6e6"/>
             </linearGradient>
             <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
               <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
@@ -64,8 +64,8 @@
         </transition>
       </div>
     </nav>
-    <div class="login-icon" @click="handleLoginClick" title="点击登录">
-      <svg width="28" height="28" viewBox="0 0 1024 1024" fill="none"><path d="M512 512c105.9 0 192-86.1 192-192S617.9 128 512 128 320 214.1 320 320s86.1 192 192 192zm0 64c-123.7 0-384 62.2-384 186.7V896c0 17.7 14.3 32 32 32h704c17.7 0 32-14.3 32-32v-133.3C896 638.2 635.7 576 512 576z" fill="#64ffda"/></svg>
+    <div class="login-icon" @click="handleLoginClick" title="點擊登入">
+      <svg width="28" height="28" viewBox="0 0 1024 1024" fill="none"><path d="M512 512c105.9 0 192-86.1 192-192S617.9 128 512 128 320 214.1 320 320s86.1 192 192 192zm0 64c-123.7 0-384 62.2-384 186.7V896c0 17.7 14.3 32 32 32h704c17.7 0 32-14.3 32-32v-133.3C896 638.2 635.7 576 512 576z" fill="#00e6e6"/></svg>
     </div>
   </header>
 </template>
@@ -118,37 +118,42 @@ onMounted(() => {
   activeIndex.value = props.currentPage
 })
 
-// 监听currentPage变化，自动切换高亮
+// 監聽 currentPage 變化，自動切換高亮
 watch(() => props.currentPage, (newVal) => {
   activeIndex.value = newVal
 })
 </script>
 
 <style scoped>
-/* 导入更加独特的字体 */
-@import url('https://fonts.googleapis.com/css2?family=Audiowide&family=Bungee+Inline&family=Bungee+Shade&family=Chakra+Petch:wght@400;600;700&family=Russo+One&family=Teko:wght@400;500;600&family=ZCOOL+KuaiLe&family=ZCOOL+QingKe+HuangYou&family=Noto+Sans+SC:wght@400;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+SC:wght@400;700;900&display=swap');
 
 :root {
-  --main-font: 'Chakra Petch', 'Noto Sans SC', sans-serif;
-  --logo-font: 'Audiowide', 'ZCOOL KuaiLe', sans-serif;
-  --menu-font: 'Teko', 'ZCOOL QingKe HuangYou', sans-serif;
-  --accent-font: 'Russo One', cursive;
+  --main-font: 'Inter', 'Noto Sans SC', sans-serif;
+  --logo-font: 'Inter', 'Noto Sans SC', sans-serif;
+  --menu-font: 'Inter', 'Noto Sans SC', sans-serif;
+  --accent-color: #00e6e6;
 }
 
 .top-navbar {
   width: 100%;
-  height: 64px;
-  background: rgba(10, 25, 47, 0.95);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(100, 255, 218, 0.1);
+  height: 72px;
+  background: rgba(30, 41, 59, 0.25);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   display: flex;
   align-items: center;
-  padding: 0 40px;
+  padding: 0 48px;
   position: fixed;
   top: 0;
   left: 0;
   z-index: 2000;
   font-family: var(--main-font);
+  margin: 16px auto 0 auto;
+  right: 0;
+  max-width: 1200px;
 }
 
 .logo-title {
@@ -158,21 +163,17 @@ watch(() => props.currentPage, (newVal) => {
   margin-right: 48px;
   position: relative;
   cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 8px;
-  transition: all 0.3s ease;
+  padding: 6px 16px;
+  border-radius: 12px;
+  transition: background 0.3s;
 }
 
 .logo-title:hover {
-  background: rgba(100, 255, 218, 0.1);
-}
-
-.logo-title:hover .logo-text {
-  text-shadow: 0 0 20px rgba(100, 255, 218, 0.5);
+  background: rgba(0, 230, 230, 0.08);
 }
 
 .logo-title.active .logo-text {
-  text-shadow: 0 0 20px rgba(100, 255, 218, 0.5);
+  text-shadow: 0 0 16px var(--accent-color);
 }
 
 .animated-logo {
@@ -180,31 +181,31 @@ watch(() => props.currentPage, (newVal) => {
   vertical-align: middle;
   width: 38px;
   height: 38px;
-  margin-right: 10px;
+  margin-right: 12px;
 }
 
 .logo-text {
-  font-size: 1.6em;
-  font-weight: 700;
-  color: #64ffda;
-  text-shadow: 0 0 15px rgba(100, 255, 218, 0.5);
+  font-size: 1.4em;
+  font-weight: 600;
+  color: var(--accent-color);
+  text-shadow: 0 0 8px var(--accent-color);
   letter-spacing: 2px;
-  margin-right: 0;
   font-family: var(--logo-font);
   text-transform: uppercase;
-  background: linear-gradient(to right, #64ffda, #1de9b6);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 0 8px rgba(100, 255, 218, 0.3));
+  background: none;
+  -webkit-background-clip: unset;
+  -webkit-text-fill-color: unset;
+  filter: none;
 }
 
 .tech-line {
-  width: 80%;
-  height: 2px;
+  width: 100%;
+  height: 2.5px;
   background: transparent;
-  margin: 2px auto 0;
+  margin: 6px auto 0 auto;
   position: relative;
   overflow: hidden;
+  border-radius: 2px;
 }
 
 .tech-line::before {
@@ -216,11 +217,11 @@ watch(() => props.currentPage, (newVal) => {
     rgba(100, 255, 218, 0), 
     rgba(100, 255, 218, 1), 
     rgba(100, 255, 218, 0));
-  left: 0;
+  left: -80px;
   top: 0;
   animation: movingLight 3s linear infinite;
+  border-radius: 2px;
 }
-
 @keyframes movingLight {
   0% {
     left: -80px;
@@ -238,53 +239,40 @@ watch(() => props.currentPage, (newVal) => {
 
 .nav-item {
   position: relative;
-  margin: 0 24px;
+  margin: 0 32px;
   font-size: 1.1em;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.8);
   cursor: pointer;
-  height: 64px;
+  height: 72px;
   display: flex;
   align-items: center;
   transition: color 0.3s;
   font-weight: 500;
-  letter-spacing: 1px;
+  letter-spacing: 1.5px;
   font-family: var(--menu-font);
   text-transform: uppercase;
 }
 
-.nav-item:hover .nav-label {
-  color: #64ffda;
-  transform: scale(1.05);
+.nav-item:hover .nav-label,
+.nav-item.active .nav-label {
+  color: var(--accent-color);
+  text-shadow: 0 0 8px var(--accent-color);
 }
 
+/* 強化 active 狀態發光效果 */
 .nav-item.active .nav-label {
-  color: #64ffda;
+  color: rgba(100,255,218,1);
   text-shadow: 0 0 15px rgba(100, 255, 218, 0.7);
   font-weight: 600;
   transform: scale(1.05);
 }
 
 .nav-label {
-  padding: 0 8px;
+  padding: 0 10px;
   font-weight: 500;
   position: relative;
-  transition: all 0.3s ease;
-}
-
-.nav-label::after {
-  content: '';
-  position: absolute;
-  bottom: -2px;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  background: #64ffda;
-  transform: scaleX(0);
-  transition: transform 0.3s ease;
-}
-
-.nav-item:hover .nav-label::after {
-  transform: scaleX(1);
+  transition: all 0.3s;
+  font-size: 1.1em;
 }
 
 .active-indicator {
@@ -292,39 +280,31 @@ watch(() => props.currentPage, (newVal) => {
   bottom: 0;
   display: flex;
   justify-content: center;
-  padding-bottom: 5px;
-}
-
-.nav-item .active-indicator {
-  width: auto;
-  left: 8px;
-  right: 8px;
-}
-
-.nav-item .active-indicator .tech-line {
-  width: 100%;
-}
-
-.logo-title .active-indicator {
-  bottom: -5px;
-  width: auto;
+  padding-bottom: 7px;
   left: 0;
   right: 0;
 }
 
-.logo-title .active-indicator .tech-line {
+.nav-item .active-indicator {
   width: 100%;
+}
+
+.logo-title .active-indicator {
+  bottom: -7px;
+  width: 100%;
+  left: 0;
+  right: 0;
 }
 
 .dropdown-list {
   position: absolute;
-  top: 64px;
+  top: 72px;
   left: 0;
-  background: rgba(10, 25, 47, 0.95);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(100, 255, 218, 0.1);
-  box-shadow: 0 8px 32px rgba(100, 255, 218, 0.2);
-  border-radius: 12px;
+  background: rgba(30, 41, 59, 0.25);
+  backdrop-filter: blur(16px) saturate(180%);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   min-width: 180px;
   padding: 16px 0;
   display: flex;
@@ -335,18 +315,19 @@ watch(() => props.currentPage, (newVal) => {
 .dropdown-item {
   display: flex;
   align-items: center;
-  padding: 8px 24px;
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 1.1em;
+  padding: 10px 28px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 1em;
   transition: all 0.3s;
   cursor: pointer;
   letter-spacing: 0.5px;
   font-family: var(--main-font);
+  border-radius: 8px;
 }
 
 .dropdown-item:hover {
-  background: rgba(100, 255, 218, 0.1);
-  color: #64ffda;
+  background: rgba(0,230,230,0.08);
+  color: var(--accent-color);
 }
 
 .dropdown-item i {
@@ -365,95 +346,21 @@ watch(() => props.currentPage, (newVal) => {
   transform: translateY(10px);
 }
 
-@media (max-width: 992px) {
-  .top-navbar {
-    padding: 0 20px;
-  }
-  
-  .logo-title {
-    margin-right: 20px;
-  }
-  
-  .nav-item {
-    margin: 0 15px;
-    font-size: 1em;
-  }
-}
-
-@media (max-width: 768px) {
-  .top-navbar {
-    height: 56px;
-    padding: 0 15px;
-  }
-  
-  .logo-title {
-    margin-right: 15px;
-  }
-  
-  .logo-text {
-    font-size: 1.3em;
-  }
-  
-  .nav-item {
-    margin: 0 10px;
-    font-size: 0.9em;
-  }
-  
-  .dropdown-list {
-    min-width: 160px;
-  }
-  
-  .dropdown-item {
-    padding: 6px 16px;
-    font-size: 0.9em;
-  }
-}
-
-@media (max-width: 480px) {
-  .top-navbar {
-    padding: 0 10px;
-  }
-  
-  .logo-title {
-    margin-right: 10px;
-  }
-  
-  .logo-text {
-    font-size: 1.1em;
-  }
-  
-  .nav-item {
-    margin: 0 5px;
-    font-size: 0.85em;
-  }
-  
-  .dropdown-list {
-    min-width: 140px;
-    left: -20px;
-  }
-  
-  .dropdown-item {
-    padding: 5px 12px;
-  }
-  
-  .dropdown-item i {
-    margin-right: 5px;
-  }
-}
-
 .login-icon {
   margin-left: auto;
-  color: #64ffda;
+  color: var(--accent-color);
   font-size: 1.7em;
   cursor: pointer;
-  padding: 8px 12px;
+  padding: 10px 14px;
   border-radius: 50%;
   transition: background 0.2s;
   display: flex;
   align-items: center;
+  background: rgba(0,230,230,0.08);
+  box-shadow: 0 2px 8px 0 rgba(0,230,230,0.08);
 }
 .login-icon:hover {
-  background: rgba(100,255,218,0.12);
+  background: rgba(0,230,230,0.18);
   color: #fff;
 }
 
@@ -485,5 +392,74 @@ watch(() => props.currentPage, (newVal) => {
   0% { r: 6; opacity: 1; }
   70% { r: 10; opacity: 0.7; }
   100% { r: 6; opacity: 1; }
+}
+
+@media (max-width: 1200px) {
+  .top-navbar {
+    max-width: 100%;
+    padding: 0 24px;
+  }
+  .logo-title {
+    margin-right: 24px;
+  }
+  .nav-item {
+    margin: 0 18px;
+  }
+}
+@media (max-width: 768px) {
+  .top-navbar {
+    height: 60px;
+    padding: 0 10px;
+    border-radius: 10px;
+  }
+  .logo-title {
+    margin-right: 10px;
+    padding: 4px 8px;
+  }
+  .logo-text {
+    font-size: 1.1em;
+  }
+  .nav-item {
+    margin: 0 8px;
+    font-size: 0.95em;
+  }
+  .dropdown-list {
+    min-width: 120px;
+    padding: 8px 0;
+  }
+  .dropdown-item {
+    padding: 6px 12px;
+    font-size: 0.95em;
+  }
+}
+@media (max-width: 480px) {
+  .top-navbar {
+    height: 48px;
+    padding: 0 2px;
+    border-radius: 6px;
+  }
+  .logo-title {
+    margin-right: 4px;
+    padding: 2px 4px;
+  }
+  .logo-text {
+    font-size: 0.9em;
+  }
+  .nav-item {
+    margin: 0 2px;
+    font-size: 0.85em;
+  }
+  .dropdown-list {
+    min-width: 80px;
+    left: -10px;
+  }
+  .dropdown-item {
+    padding: 4px 6px;
+    font-size: 0.85em;
+  }
+  .login-icon {
+    padding: 6px 6px;
+    font-size: 1.2em;
+  }
 }
 </style> 
