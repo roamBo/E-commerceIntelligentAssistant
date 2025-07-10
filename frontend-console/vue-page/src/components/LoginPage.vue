@@ -2,7 +2,7 @@
   <div class="login-page">
     <div class="login-card">
       <h2 class="login-title">用户登录</h2>
-      <el-form :model="form" :rules="rules" ref="loginForm" label-width="0">
+      <el-form :model="form" :rules="rules" ref="loginForm" label-width="0" @keyup.enter.native="onLogin" tabindex="0">
         <el-form-item prop="username">
           <el-input v-model="form.username" placeholder="用户名" prefix-icon="el-icon-user" clearable />
         </el-form-item>
@@ -18,11 +18,31 @@
         </div>
       </el-form>
     </div>
+    <!-- 註冊彈窗 -->
+    <el-dialog v-model="registerDialog" title="注册新用户" width="400px">
+      <el-form :model="registerForm" :rules="registerRules" ref="registerFormRef" label-width="0" @keyup.enter.native="onRegisterSubmit" tabindex="0">
+        <el-form-item prop="username">
+          <el-input v-model="registerForm.username" placeholder="用戶名" />
+        </el-form-item>
+        <el-form-item prop="password">
+          <el-input v-model="registerForm.password" placeholder="密码" show-password />
+        </el-form-item>
+        <el-form-item prop="email">
+          <el-input v-model="registerForm.email" placeholder="电子邮件" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="registerDialog = false">取消</el-button>
+        <el-button type="primary" @click="onRegisterSubmit" :loading="registerLoading">注册</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import api from '@/services/api'
 const form = ref({ username: '', password: '' })
 const rules = {
   username: [ { required: true, message: '请输入用户名', trigger: 'blur' } ],
@@ -30,22 +50,85 @@ const rules = {
 }
 const loading = ref(false)
 const loginForm = ref(null)
+const user = ref(null)
 
-const emit = defineEmits(['login', 'register', 'forgot'])
+// 檢查 localStorage 是否已有登入用戶
+if (localStorage.getItem('loginUser')) {
+  try {
+    user.value = JSON.parse(localStorage.getItem('loginUser'))
+  } catch (e) {
+    user.value = null
+  }
+}
+
+const emit = defineEmits(['login', 'register', 'forgot', 'showUser'])
+
+// 註冊相關
+const registerDialog = ref(false)
+const registerForm = ref({ username: '', password: '', email: '' })
+const registerFormRef = ref(null)
+const registerLoading = ref(false)
+const registerRules = {
+  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
+  password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
+  email: [{ required: true, message: '请输入电子邮件', trigger: 'blur' }]
+}
 
 const onLogin = () => {
-  loginForm.value.validate(valid => {
+  if (user.value) {
+    // 已登入，顯示用戶資訊
+    emit('showUser', user.value)
+    return
+  }
+  loginForm.value.validate(async valid => {
     if (valid) {
       loading.value = true
-      setTimeout(() => {
+      try {
+        const loginUser = await api.userApi.login(form.value.username, form.value.password)
         loading.value = false
-        emit('login', form.value)
-      }, 1000)
+        user.value = loginUser
+        localStorage.setItem('loginUser', JSON.stringify(loginUser))
+        emit('login', loginUser)
+        ElMessage.success('登入成功')
+      } catch (err) {
+        loading.value = false
+        ElMessage.error(err.message || '登入失败')
+      }
     }
   })
 }
-const onRegister = () => emit('register')
-const onForgot = () => emit('forgot')
+const onRegister = () => {
+  registerDialog.value = true
+}
+const onRegisterSubmit = () => {
+  registerFormRef.value.validate(async valid => {
+    if (valid) {
+      registerLoading.value = true
+      try {
+        await api.userApi.register(
+          registerForm.value.username,
+          registerForm.value.password,
+          registerForm.value.email
+        )
+        registerLoading.value = false
+        ElMessage.success('注册成功，请登入')
+        registerDialog.value = false
+        registerForm.value = { username: '', password: '', email: '' }
+      } catch (err) {
+        registerLoading.value = false
+        ElMessage.error(err.message || '注册失败')
+      }
+    }
+  })
+}
+const onForgot = () => {
+  ElMessage.warning('请联系管理员或客服重置密码。')
+}
+
+const logout = () => {
+  user.value = null
+  localStorage.removeItem('loginUser')
+}
 </script>
 
 <style scoped>
@@ -86,5 +169,16 @@ const onForgot = () => emit('forgot')
   justify-content: space-between;
   width: 100%;
   margin-top: 8px;
+}
+.login-actions .el-link--info {
+  color: #409EFF !important;
+}
+/* 強制所有 el-input 欄位寬度固定 */
+.el-input,
+.el-input__inner {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
 }
 </style> 

@@ -145,8 +145,55 @@ export const getMockOrderData = () => {
   ];
 };
 
+/**
+ * 用戶服務 API
+ */
+export const userApi = {
+  /**
+   * 登入
+   * @param {string} username
+   * @param {string} password
+   * @returns {Promise} 用戶資料或錯誤
+   */
+  login: async (username, password) => {
+    try {
+      const response = await axios.get('http://10.172.141.46:3000/api/users');
+      const users = response.data;
+      const user = users.find(
+        u => u.username === username && u.userpassword === password
+      );
+      if (!user) {
+        throw new Error('用戶名或密碼錯誤');
+      }
+      return user;
+    } catch (error) {
+      throw error;
+    }
+  },
+  /**
+   * 註冊
+   * @param {string} username
+   * @param {string} password
+   * @param {string} email
+   * @returns {Promise} 新用戶資料或錯誤
+   */
+  register: async (username, password, email) => {
+    try {
+      const response = await axios.post('http://10.172.141.46:3000/api/register', {
+        username,
+        password,
+        email
+      });
+      return response.data.user;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  }
+};
+
 export default {
   orderApi,
   transformOrderData,
-  getMockOrderData
+  getMockOrderData,
+  userApi // 新增這行
 }; 
