@@ -125,6 +125,16 @@ watch(() => props.currentPage, (newVal) => {
 </script>
 
 <style scoped>
+/* 导入更加独特的字体 */
+@import url('https://fonts.googleapis.com/css2?family=Audiowide&family=Bungee+Inline&family=Bungee+Shade&family=Chakra+Petch:wght@400;600;700&family=Russo+One&family=Teko:wght@400;500;600&family=ZCOOL+KuaiLe&family=ZCOOL+QingKe+HuangYou&family=Noto+Sans+SC:wght@400;700;900&display=swap');
+
+:root {
+  --main-font: 'Chakra Petch', 'Noto Sans SC', sans-serif;
+  --logo-font: 'Audiowide', 'ZCOOL KuaiLe', sans-serif;
+  --menu-font: 'Teko', 'ZCOOL QingKe HuangYou', sans-serif;
+  --accent-font: 'Russo One', cursive;
+}
+
 .top-navbar {
   width: 100%;
   height: 64px;
@@ -138,6 +148,7 @@ watch(() => props.currentPage, (newVal) => {
   top: 0;
   left: 0;
   z-index: 2000;
+  font-family: var(--main-font);
 }
 
 .logo-title {
@@ -173,12 +184,18 @@ watch(() => props.currentPage, (newVal) => {
 }
 
 .logo-text {
-  font-size: 1.5em;
-  font-weight: bold;
+  font-size: 1.6em;
+  font-weight: 700;
   color: #64ffda;
-  text-shadow: 0 0 10px rgba(100, 255, 218, 0.3);
+  text-shadow: 0 0 15px rgba(100, 255, 218, 0.5);
   letter-spacing: 2px;
   margin-right: 0;
+  font-family: var(--logo-font);
+  text-transform: uppercase;
+  background: linear-gradient(to right, #64ffda, #1de9b6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 8px rgba(100, 255, 218, 0.3));
 }
 
 .tech-line {
@@ -222,28 +239,36 @@ watch(() => props.currentPage, (newVal) => {
 .nav-item {
   position: relative;
   margin: 0 24px;
-  font-size: 1.1em;
+  font-size: 1.3em;
   color: rgba(255, 255, 255, 0.7);
   cursor: pointer;
   height: 64px;
   display: flex;
   align-items: center;
   transition: color 0.3s;
+  font-weight: 500;
+  letter-spacing: 1px;
+  font-family: var(--menu-font);
+  text-transform: uppercase;
 }
 
 .nav-item:hover .nav-label {
   color: #64ffda;
+  transform: scale(1.05);
 }
 
 .nav-item.active .nav-label {
   color: #64ffda;
-  text-shadow: 0 0 10px rgba(100, 255, 218, 0.5);
+  text-shadow: 0 0 15px rgba(100, 255, 218, 0.7);
+  font-weight: 600;
+  transform: scale(1.05);
 }
 
 .nav-label {
   padding: 0 8px;
   font-weight: 500;
   position: relative;
+  transition: all 0.3s ease;
 }
 
 .nav-label::after {
@@ -304,6 +329,7 @@ watch(() => props.currentPage, (newVal) => {
   padding: 16px 0;
   display: flex;
   flex-direction: column;
+  font-family: var(--main-font);
 }
 
 .dropdown-item {
@@ -311,9 +337,11 @@ watch(() => props.currentPage, (newVal) => {
   align-items: center;
   padding: 8px 24px;
   color: rgba(255, 255, 255, 0.7);
-  font-size: 1em;
+  font-size: 1.1em;
   transition: all 0.3s;
   cursor: pointer;
+  letter-spacing: 0.5px;
+  font-family: var(--main-font);
 }
 
 .dropdown-item:hover {
