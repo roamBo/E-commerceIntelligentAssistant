@@ -4,8 +4,11 @@ import org.randombo.productservice.model.Product;
 import org.randombo.productservice.repository.ProductRepository;
 import org.randombo.productservice.service.ProductService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -25,10 +28,7 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public Product createProduct(Product product) {
-        // 如果调用方没带 id，则自动生成；否则沿用
-        if (product.getId() == null || product.getId().isBlank()) {
-            product.setId(UUID.randomUUID().toString());
-        }
+        product.setId(UUID.randomUUID().toString());
         product.setCreateTime(LocalDateTime.now());
         product.setUpdateTime(LocalDateTime.now());
         if (product.getStatus() == null) {
@@ -59,6 +59,19 @@ public class ProductServiceImpl implements ProductService {
         Iterable<Product> products = productRepository.findAll();
         return StreamSupport.stream(products.spliterator(), false)
                 .collect(Collectors.toList());
+//        try {
+//            // 方法1：使用分页查询（推荐）
+//            Pageable pageable = PageRequest.of(0, Integer.MAX_VALUE);
+//            return productRepository.findAll(pageable).getContent();
+//        } catch (Exception e) {
+//            System.err.println("查询所有商品失败: " + e.getMessage());
+//            try {
+//
+//            } catch (Exception ex) {
+//                System.err.println("备用查询方法也失败: " + ex.getMessage());
+//                return new ArrayList<>();
+//            }
+//        }
     }
 
     @Override
@@ -68,6 +81,38 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public List<Product> searchProductsByName(String name) {
+//        return productRepository.findByNameContaining(name);
+//        try {
+//            // 首先尝试使用分析器搜索
+//            List<Product> results = productRepository.searchByNameWithAnalyzer(name);
+//
+//            // 如果结果为空，尝试模糊搜索
+//            if (results.isEmpty()) {
+//                results = productRepository.searchByNameWildcard(name);
+//            }
+//
+//            // 如果还是为空，尝试多字段搜索
+//            if (results.isEmpty()) {
+//                results = productRepository.searchByMultipleFields(name);
+//            }
+//
+//            // 如果还是为空，使用原始的containing方法作为最后的备选
+//            if (results.isEmpty()) {
+//                results = productRepository.findByNameContaining(name);
+//            }
+//
+//            System.out.println("搜索关键词: " + name + ", 找到 " + results.size() + " 个结果");
+//            results.forEach(product ->
+//                    System.out.println("  - " + product.getName() + " (¥" + product.getPrice() + ")")
+//            );
+//
+//            return results;
+//        } catch (Exception e) {
+//            System.err.println("搜索商品失败: " + e.getMessage());
+//            e.printStackTrace();
+//            // 返回空列表而不是抛出异常
+//            return new ArrayList<>();
+//        }
         try {
             System.out.println("=== 开始搜索商品，关键词: " + name + " ===");
 
@@ -187,6 +232,11 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public Optional<Product> updatePrice(String id, BigDecimal newPrice) {
+        // 添加价格验证
+        if (newPrice.compareTo(BigDecimal.ZERO) < 0) {
+            return productRepository.findById(id);
+        }
+
         return productRepository.findById(id).map(product -> {
             product.setPrice(newPrice);
             product.setUpdateTime(LocalDateTime.now());
@@ -204,10 +254,16 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+// ProductServiceImpl.java
     public boolean deleteProduct(String id) {
         if (productRepository.existsById(id)) {
-            productRepository.deleteById(id);
-            return true;
+            try {
+                productRepository.deleteById(id);
+                return true;
+            } catch (EmptyResultDataAccessException ex) {
+                // 处理并发删除场景
+                return false;
+            }
         }
         return false;
     }
@@ -215,9 +271,7 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public List<Product> createProducts(List<Product> products) {
         products.forEach(product -> {
-            if (product.getId() == null || product.getId().isBlank()) {
-                product.setId(UUID.randomUUID().toString());
-            }
+            product.setId(UUID.randomUUID().toString());
             product.setCreateTime(LocalDateTime.now());
             product.setUpdateTime(LocalDateTime.now());
             if (product.getStatus() == null) {
