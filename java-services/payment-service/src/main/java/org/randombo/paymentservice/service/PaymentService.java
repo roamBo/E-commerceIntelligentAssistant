@@ -1,6 +1,5 @@
 package org.randombo.paymentservice.service;
 
-import com.alipay.api.AlipayApiException;
 import org.randombo.paymentservice.model.Payment;
 
 import java.util.List;
@@ -13,5 +12,4 @@ public interface PaymentService {
     Payment updatePayment(String id, Payment payment);
     void deletePayment(String id);
     Payment updatePaymentStatus(String id, String status);
-    String createAlipayOrder(String out_trade_no, String total_amount, String subject) throws AlipayApiException;
 }
