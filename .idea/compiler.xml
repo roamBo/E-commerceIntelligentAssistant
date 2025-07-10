@@ -9,18 +9,18 @@
         <outputRelativeToContentRoot value="true" />
         <module name="services-gateway" />
         <module name="product-service" />
-        <module name="order-service" />
         <module name="payment-service" />
+        <module name="order-service" />
       </profile>
     </annotationProcessing>
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="java-services" options="" />
-      <module name="order-service" options="" />
-      <module name="payment-service" options="" />
-      <module name="product-service" options="" />
-      <module name="services-gateway" options="" />
+      <module name="order-service" options="-parameters" />
+      <module name="payment-service" options="-parameters" />
+      <module name="product-service" options="-parameters" />
+      <module name="services-gateway" options="-parameters" />
     </option>
   </component>
 </project>

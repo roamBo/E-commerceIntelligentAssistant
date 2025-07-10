@@ -9,11 +9,16 @@
  * @returns {Object} 订单对象
  */
 export const createOrderModel = (data = {}) => {
+  // 直接保留後端狀態
+  let date = data.orderTime || data.date || new Date().toLocaleString();
+  if (typeof date === 'string' && date.includes('T')) {
+    date = date.replace('T', ' ').split('.')[0];
+  }
   return {
     id: data.orderId || data.id || `ORD-${Math.floor(Math.random() * 10000)}`,
     userId: data.userId || 0,
-    date: data.orderTime || data.date || new Date().toLocaleString(),
-    status: data.status || 'pending',
+    date,
+    status: data.status || 'PENDING_PAYMENT',
     products: (data.items || data.products || []).map(item => createProductModel(item)),
     logistics: createLogisticsModel(data.logistics),
     shippingAddress: data.shippingAddress || '',
@@ -88,4 +93,4 @@ export default {
   createLogisticsModel,
   calculateTotalAmount,
   createOrderRequestData
-}; 
+};

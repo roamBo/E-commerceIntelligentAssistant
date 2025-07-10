@@ -1,178 +1,205 @@
 <template>
   <div class="order-manager">
-    <div class="order-header">
-      <h2>订单智能管家</h2>
-      <div class="search-box">
-        <el-input
-          v-model="searchKeyword"
-          placeholder="搜索订单编号/商品名称"
-          prefix-icon="el-icon-search"
-          clearable
-        />
-        <el-button type="primary" class="search-btn">搜索</el-button>
-        <el-button type="success" @click="showCreateOrderDialog">创建订单</el-button>
-      </div>
+    <div v-if="!loginUser" class="login-tip">
+      <el-empty description="请先登录以查看您的订单" :image-size="180" />
+      <el-button type="primary" @click="goLogin">去登录</el-button>
     </div>
+    <template v-else>
+      <div class="order-header">
+        <h2>订单智能管家</h2>
+        <div class="search-box">
+          <el-input
+            v-model="searchKeyword"
+            placeholder="搜索订单编号/商品名称"
+            prefix-icon="el-icon-search"
+            clearable
+          />
+          <el-button type="primary" class="search-btn" @click="handleSearch">搜索</el-button>
+        </div>
+      </div>
 
-    <div class="filter-bar">
-      <el-radio-group v-model="orderStatus" size="medium">
-        <el-radio-button label="all">全部订单</el-radio-button>
-        <el-radio-button label="pending">待付款</el-radio-button>
-        <el-radio-button label="processing">处理中</el-radio-button>
-        <el-radio-button label="shipped">已发货</el-radio-button>
-        <el-radio-button label="completed">已完成</el-radio-button>
-      </el-radio-group>
-      
-      <div class="date-filter">
-        <el-date-picker
-          v-model="dateRange"
-          type="daterange"
-          range-separator="至"
-          start-placeholder="开始日期"
-          end-placeholder="结束日期"
-          format="YYYY-MM-DD"
-          value-format="YYYY-MM-DD"
-          size="medium"
-        />
-      </div>
-    </div>
-    
-    <div class="order-list">
-      <el-empty 
-        v-if="filteredOrders.length === 0 && !loading" 
-        description="暂无订单数据" 
-        :image-size="200">
-      </el-empty>
-      
-      <div v-if="loading" class="loading-container">
-        <el-skeleton :rows="3" animated />
-        <el-skeleton :rows="3" animated style="margin-top: 20px;" />
+      <div class="filter-bar">
+        <el-radio-group v-model="orderStatus" size="medium">
+          <el-radio-button label="all">全部订单</el-radio-button>
+          <el-radio-button label="PENDING_PAYMENT">待付款</el-radio-button>
+          <el-radio-button label="PAID">处理中</el-radio-button>
+          <el-radio-button label="DELIVERED">已发货</el-radio-button>
+          <el-radio-button label="FINISH">已完成</el-radio-button>
+        </el-radio-group>
+        
+        <div class="date-filter">
+          <el-date-picker
+            v-model="dateRange"
+            type="daterange"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD"
+            size="medium"
+          />
+        </div>
       </div>
       
-      <el-card v-for="order in filteredOrders" :key="order.id" class="order-item" shadow="hover">
-        <div class="order-top">
-          <div class="order-info">
-            <span class="order-id">订单编号: {{ order.id }}</span>
-            <span class="order-date">下单时间: {{ order.date }}</span>
-            <span class="user-id">用户ID: {{ order.userId }}</span>
-          </div>
-          <div class="order-status">
-            <el-tag :type="getStatusType(order.status)">{{ getStatusText(order.status) }}</el-tag>
-          </div>
+      <div class="order-list">
+        <el-empty 
+          v-if="filteredOrders.length === 0 && !loading" 
+          description="暂无订单数据" 
+          :image-size="200">
+        </el-empty>
+        
+        <div v-if="loading" class="loading-container">
+          <el-skeleton :rows="3" animated />
+          <el-skeleton :rows="3" animated style="margin-top: 20px;" />
         </div>
         
-        <div class="order-products">
-          <div v-for="product in order.products" :key="product.id" class="product-item">
-            <div class="product-img">
-              <img :src="product.image" :alt="product.name">
+        <el-card v-for="order in filteredOrders" :key="order.id" class="order-item" shadow="hover">
+          <div class="order-top">
+            <div class="order-info">
+              <span class="order-id">订单编号: {{ order.id }}</span>
+              <span class="order-date">下单时间: {{ order.date }}</span>
             </div>
-            <div class="product-info">
-              <div class="product-name">{{ product.name }}</div>
-              <div class="product-attrs">{{ product.attrs }}</div>
-              <div class="product-price">¥{{ product.price.toFixed(2) }} × {{ product.quantity }}</div>
+            <div class="order-status">
+              <el-tag :type="getStatusType(order.status)">{{ getStatusText(order.status) }}</el-tag>
             </div>
-          </div>
-        </div>
-        
-        <div class="order-address" v-if="order.shippingAddress">
-          <i class="el-icon-location"></i>
-          <span>收货地址: {{ order.shippingAddress }}</span>
-        </div>
-        
-        <div class="order-bottom">
-          <div class="order-logistics">
-            <i class="el-icon-truck"></i>
-            <span>物流状态: {{ order.logistics.status }}</span>
-            <span class="logistics-company">{{ order.logistics.company }}</span>
-            <span class="logistics-number">运单号: {{ order.logistics.trackingNumber }}</span>
-          </div>
-          <div class="order-amount">
-            <span>共{{ getTotalQuantity(order) }}件商品</span>
-            <span class="amount">合计: <strong>¥{{ getTotalAmount(order).toFixed(2) }}</strong></span>
-          </div>
-          <div class="order-actions">
-            <el-button size="small" v-if="order.status === 'pending'">付款</el-button>
-            <el-button size="small" v-if="order.status === 'shipped'">确认收货</el-button>
-            <el-button size="small" type="info" plain>查看详情</el-button>
-          </div>
-        </div>
-      </el-card>
-    </div>
-
-    <!-- 创建订单对话框 -->
-    <el-dialog
-      title="创建新订单"
-      :visible.sync="createOrderDialogVisible"
-      width="50%"
-      :before-close="handleCloseDialog"
-    >
-      <el-form :model="newOrderForm" label-width="120px" :rules="orderFormRules" ref="orderForm">
-        <el-form-item label="用户ID" prop="userId">
-          <el-input v-model.number="newOrderForm.userId" type="number"></el-input>
-        </el-form-item>
-        
-        <el-form-item label="收货地址" prop="shippingAddress">
-          <el-input v-model="newOrderForm.shippingAddress" type="textarea" :rows="2"></el-input>
-        </el-form-item>
-        
-        <el-form-item label="商品" prop="products">
-          <div v-for="(product, index) in newOrderForm.products" :key="index" class="product-form-item">
-            <el-row :gutter="10">
-              <el-col :span="6">
-                <el-form-item :prop="`products.${index}.productId`" :rules="{ required: true, message: '请输入商品ID', trigger: 'blur' }">
-                  <el-input v-model="product.productId" placeholder="商品ID"></el-input>
-                </el-form-item>
-              </el-col>
-              <el-col :span="6">
-                <el-form-item :prop="`products.${index}.productName`" :rules="{ required: true, message: '请输入商品名称', trigger: 'blur' }">
-                  <el-input v-model="product.productName" placeholder="商品名称"></el-input>
-                </el-form-item>
-              </el-col>
-              <el-col :span="4">
-                <el-form-item :prop="`products.${index}.quantity`" :rules="{ required: true, type: 'number', min: 1, message: '数量必须大于0', trigger: 'blur' }">
-                  <el-input-number v-model="product.quantity" :min="1" placeholder="数量"></el-input-number>
-                </el-form-item>
-              </el-col>
-              <el-col :span="4">
-                <el-form-item :prop="`products.${index}.unitPrice`" :rules="{ required: true, type: 'number', min: 0.01, message: '价格必须大于0', trigger: 'blur' }">
-                  <el-input-number v-model="product.unitPrice" :min="0.01" :precision="2" placeholder="单价"></el-input-number>
-                </el-form-item>
-              </el-col>
-              <el-col :span="4">
-                <el-button type="danger" icon="el-icon-delete" circle @click="removeProduct(index)" v-if="newOrderForm.products.length > 1"></el-button>
-              </el-col>
-            </el-row>
           </div>
           
-          <div class="add-product-btn">
-            <el-button type="primary" icon="el-icon-plus" @click="addProduct">添加商品</el-button>
+          <div class="order-products">
+            <div v-for="product in order.products" :key="product.id" class="product-item">
+              <div class="product-img">
+                <img :src="product.image" :alt="product.name">
+              </div>
+              <div class="product-info">
+                <div class="product-name">{{ product.name }}</div>
+                <div class="product-attrs">{{ product.attrs }}</div>
+                <div class="product-price">¥{{ product.price.toFixed(2) }} × {{ product.quantity }}</div>
+              </div>
+            </div>
           </div>
-        </el-form-item>
+          
+          <div class="order-address" v-if="order.shippingAddress">
+            <i class="el-icon-location"></i>
+            <span>收货地址: {{ order.shippingAddress }}</span>
+          </div>
+          
+          <div class="order-bottom">
+            <div class="order-logistics">
+              <i class="el-icon-truck"></i>
+              <span>物流状态: {{ getStatusText(order.status) }}</span>
+              <span class="logistics-company">{{ order.logistics.company }}</span>
+              <span class="logistics-number">运单号: {{ order.logistics.trackingNumber }}</span>
+            </div>
+            <div class="order-actions">
+              <el-button size="small" v-if="order.status === 'DELIVERED'">确认收货</el-button>
+            </div>
+            <div class="order-amount order-amount-fixed">
+              <span>共{{ getTotalQuantity(order) }}件商品</span>
+              <span class="amount">合计: <strong>¥{{ getTotalAmount(order).toFixed(2) }}</strong></span>
+            </div>
+          </div>
+        </el-card>
+      </div>
+
+      <!-- 创建订单对话框 -->
+      <el-dialog
+        title="创建新订单"
+        :visible.sync="createOrderDialogVisible"
+        width="50%"
+        :before-close="handleCloseDialog"
+      >
+        <el-form :model="newOrderForm" label-width="120px" :rules="orderFormRules" ref="orderForm">
+          <el-form-item label="用户ID" prop="userId">
+            <el-input v-model.number="newOrderForm.userId" type="number"></el-input>
+          </el-form-item>
+          
+          <el-form-item label="收货地址" prop="shippingAddress">
+            <el-input v-model="newOrderForm.shippingAddress" type="textarea" :rows="2"></el-input>
+          </el-form-item>
+          
+          <el-form-item label="商品" prop="products">
+            <div v-for="(product, index) in newOrderForm.products" :key="index" class="product-form-item">
+              <el-row :gutter="10">
+                <el-col :span="6">
+                  <el-form-item :prop="`products.${index}.productId`" :rules="{ required: true, message: '请输入商品ID', trigger: 'blur' }">
+                    <el-input v-model="product.productId" placeholder="商品ID"></el-input>
+                  </el-form-item>
+                </el-col>
+                <el-col :span="6">
+                  <el-form-item :prop="`products.${index}.productName`" :rules="{ required: true, message: '请输入商品名称', trigger: 'blur' }">
+                    <el-input v-model="product.productName" placeholder="商品名称"></el-input>
+                  </el-form-item>
+                </el-col>
+                <el-col :span="4">
+                  <el-form-item :prop="`products.${index}.quantity`" :rules="{ required: true, type: 'number', min: 1, message: '数量必须大于0', trigger: 'blur' }">
+                    <el-input-number v-model="product.quantity" :min="1" placeholder="数量"></el-input-number>
+                  </el-form-item>
+                </el-col>
+                <el-col :span="4">
+                  <el-form-item :prop="`products.${index}.unitPrice`" :rules="{ required: true, type: 'number', min: 0.01, message: '价格必须大于0', trigger: 'blur' }">
+                    <el-input-number v-model="product.unitPrice" :min="0.01" :precision="2" placeholder="单价"></el-input-number>
+                  </el-form-item>
+                </el-col>
+                <el-col :span="4">
+                  <el-button type="danger" icon="el-icon-delete" circle @click="removeProduct(index)" v-if="newOrderForm.products.length > 1"></el-button>
+                </el-col>
+              </el-row>
+            </div>
+            
+            <div class="add-product-btn">
+              <el-button type="primary" icon="el-icon-plus" @click="addProduct">添加商品</el-button>
+            </div>
+          </el-form-item>
+          
+          <el-form-item label="总金额">
+            <span class="calculated-amount">¥{{ calculateNewOrderAmount() }}</span>
+          </el-form-item>
+        </el-form>
         
-        <el-form-item label="总金额">
-          <span class="calculated-amount">¥{{ calculateNewOrderAmount() }}</span>
-        </el-form-item>
-      </el-form>
-      
-      <span slot="footer" class="dialog-footer">
-        <el-button @click="handleCloseDialog">取消</el-button>
-        <el-button type="primary" @click="submitNewOrder" :loading="submitting">确定</el-button>
-      </span>
-    </el-dialog>
+        <span slot="footer" class="dialog-footer">
+          <el-button @click="handleCloseDialog">取消</el-button>
+          <el-button type="primary" @click="submitNewOrder" :loading="submitting">确定</el-button>
+        </span>
+      </el-dialog>
+    </template>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, reactive } from 'vue'
+import { ref, computed, onMounted, reactive, getCurrentInstance } from 'vue'
 import orderService from '../services/orderService'
 import orderModel from '../services/orderModel'
+import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
 
+const router = useRouter ? useRouter() : null
 const searchKeyword = ref('')
+const searchActionKeyword = ref('')
 const orderStatus = ref('all')
 const dateRange = ref([])
 const loading = ref(false)
 const submitting = ref(false)
 const createOrderDialogVisible = ref(false)
+
+// 登入用戶
+const loginUser = ref(null)
+if (localStorage.getItem('loginUser')) {
+  try {
+    loginUser.value = JSON.parse(localStorage.getItem('loginUser'))
+  } catch (e) {
+    loginUser.value = null
+  }
+}
+
+const instance = getCurrentInstance()
+
+const goLogin = () => {
+  // 若有 router，則跳轉，否則 emit 事件讓父組件切換 currentPage
+  if (router) {
+    router.push('/login')
+  } else if (instance && instance.emit) {
+    instance.emit('goLogin')
+  }
+}
 
 // 订单表单相关
 const orderForm = ref(null)
@@ -283,9 +310,13 @@ const orders = ref([])
 
 // 获取订单列表
 const fetchOrders = async () => {
+  if (!loginUser.value) return
   loading.value = true
   try {
-    orders.value = await orderService.getOrders()
+    orders.value = (await orderService.getOrders()).filter(o => o.userId == loginUser.value.userID)
+    ElMessage.success({ message: '订单数据读取成功', duration: 1000 })
+  } catch (e) {
+    ElMessage.error({ message: '订单数据读取失败', duration: 1000 })
   } finally {
     loading.value = false
   }
@@ -293,34 +324,49 @@ const fetchOrders = async () => {
 
 // 初始加载
 onMounted(() => {
-  fetchOrders()
+  if (loginUser.value) fetchOrders()
 })
 
 // 根据筛选条件过滤订单
 const filteredOrders = computed(() => {
-  // 使用 orderService 的方法进行过滤
   let result = orders.value
-  
-  // 根据订单状态过滤
   result = orderService.filterOrdersByStatus(result, orderStatus.value)
-  
-  // 根据关键词搜索
-  result = orderService.searchOrders(result, searchKeyword.value)
-  
-  // 根据日期范围过滤
+  // 用searchActionKeyword进行搜索
+  result = orderService.searchOrders(result, searchActionKeyword.value)
   result = orderService.filterOrdersByDateRange(result, dateRange.value)
-  
   return result
 })
 
 // 获取订单状态对应的Tag类型
 const getStatusType = (status) => {
-  return orderService.getStatusType(status)
+  switch (status) {
+    case 'PENDING_PAYMENT':
+      return 'info'
+    case 'PAID':
+      return 'warning'
+    case 'DELIVERED':
+      return 'success'
+    case 'FINISH':
+      return 'success'
+    default:
+      return 'info'
+  }
 }
 
 // 获取订单状态的中文描述
 const getStatusText = (status) => {
-  return orderService.getStatusText(status)
+  switch (status) {
+    case 'PENDING_PAYMENT':
+      return '待付款'
+    case 'PAID':
+      return '处理中'
+    case 'DELIVERED':
+      return '已发货'
+    case 'FINISH':
+      return '已完成'
+    default:
+      return status
+  }
 }
 
 // 计算订单商品总数
@@ -331,6 +377,11 @@ const getTotalQuantity = (order) => {
 // 计算订单总金额
 const getTotalAmount = (order) => {
   return orderService.calculateTotalAmount(order)
+}
+
+// 搜索按钮点击事件
+const handleSearch = () => {
+  searchActionKeyword.value = searchKeyword.value
 }
 </script>
 
@@ -399,6 +450,7 @@ const getTotalAmount = (order) => {
 
 .order-item {
   border-radius: 8px;
+  position: relative;
 }
 
 .order-top {
@@ -597,4 +649,27 @@ const getTotalAmount = (order) => {
   color: #f56c6c;
   font-weight: bold;
 }
-</style> 
+
+.login-tip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+}
+
+/* 新增右下角固定樣式 */
+.order-amount-fixed {
+  position: absolute;
+  right: 24px;
+  bottom: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  z-index: 2;
+  background: rgba(255,255,255,0.95);
+  border-radius: 8px;
+  padding: 8px 16px;
+  box-shadow: 0 2px 8px rgba(64,158,255,0.07);
+}
+</style>
