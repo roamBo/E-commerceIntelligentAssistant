@@ -5,9 +5,7 @@ import org.randombo.productservice.repository.ProductRepository;
 import org.randombo.productservice.service.ProductService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -27,7 +25,10 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public Product createProduct(Product product) {
-        product.setId(UUID.randomUUID().toString());
+        // 如果调用方没带 id，则自动生成；否则沿用
+        if (product.getId() == null || product.getId().isBlank()) {
+            product.setId(UUID.randomUUID().toString());
+        }
         product.setCreateTime(LocalDateTime.now());
         product.setUpdateTime(LocalDateTime.now());
         if (product.getStatus() == null) {
@@ -58,19 +59,6 @@ public class ProductServiceImpl implements ProductService {
         Iterable<Product> products = productRepository.findAll();
         return StreamSupport.stream(products.spliterator(), false)
                 .collect(Collectors.toList());
-//        try {
-//            // 方法1：使用分页查询（推荐）
-//            Pageable pageable = PageRequest.of(0, Integer.MAX_VALUE);
-//            return productRepository.findAll(pageable).getContent();
-//        } catch (Exception e) {
-//            System.err.println("查询所有商品失败: " + e.getMessage());
-//            try {
-//
-//            } catch (Exception ex) {
-//                System.err.println("备用查询方法也失败: " + ex.getMessage());
-//                return new ArrayList<>();
-//            }
-//        }
     }
 
     @Override
@@ -80,38 +68,6 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public List<Product> searchProductsByName(String name) {
-//        return productRepository.findByNameContaining(name);
-//        try {
-//            // 首先尝试使用分析器搜索
-//            List<Product> results = productRepository.searchByNameWithAnalyzer(name);
-//
-//            // 如果结果为空，尝试模糊搜索
-//            if (results.isEmpty()) {
-//                results = productRepository.searchByNameWildcard(name);
-//            }
-//
-//            // 如果还是为空，尝试多字段搜索
-//            if (results.isEmpty()) {
-//                results = productRepository.searchByMultipleFields(name);
-//            }
-//
-//            // 如果还是为空，使用原始的containing方法作为最后的备选
-//            if (results.isEmpty()) {
-//                results = productRepository.findByNameContaining(name);
-//            }
-//
-//            System.out.println("搜索关键词: " + name + ", 找到 " + results.size() + " 个结果");
-//            results.forEach(product ->
-//                    System.out.println("  - " + product.getName() + " (¥" + product.getPrice() + ")")
-//            );
-//
-//            return results;
-//        } catch (Exception e) {
-//            System.err.println("搜索商品失败: " + e.getMessage());
-//            e.printStackTrace();
-//            // 返回空列表而不是抛出异常
-//            return new ArrayList<>();
-//        }
         try {
             System.out.println("=== 开始搜索商品，关键词: " + name + " ===");
 
@@ -259,7 +215,9 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public List<Product> createProducts(List<Product> products) {
         products.forEach(product -> {
-            product.setId(UUID.randomUUID().toString());
+            if (product.getId() == null || product.getId().isBlank()) {
+                product.setId(UUID.randomUUID().toString());
+            }
             product.setCreateTime(LocalDateTime.now());
             product.setUpdateTime(LocalDateTime.now());
             if (product.getStatus() == null) {

@@ -46,7 +46,7 @@ public class Product {
     @Field(type = FieldType.Keyword)
     private List<String> tags;
 
-    @Field(type = FieldType.Text)
+    @Field(type = FieldType.Keyword, index = false)
     private String imageUrl;
 
     @Field(type = FieldType.Date, format = {}, pattern = "yyyy-MM-dd'T'HH:mm:ss")
