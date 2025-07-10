@@ -126,7 +126,7 @@ class PaymentServiceAPI:
         路径：/api/payments/{id}/status
         """
         url = f"{self.base_url}/api/payments/{payment_id}/status"
-        data = {"status": status}
+        data = status
         
         try:
             response = self.session.patch(url, json=data)
