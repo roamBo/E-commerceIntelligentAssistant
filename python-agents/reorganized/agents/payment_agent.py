@@ -1,38 +1,27 @@
 # agents/payment_agent.py
 import logging
-import asyncio  # 【新增】用于异步包装 requests
-import requests  # 【新增】用于同步 HTTP 请求
+import asyncio
+import requests
 import json
 import time
 from datetime import datetime
-from typing import Dict, Any, Optional, List, TypedDict
-from urllib.parse import urlparse  # 【新增】用于解析 Redis URL
+from typing import Dict, Any, Optional, List
+from urllib.parse import urlparse
 
 from langchain_openai import ChatOpenAI
-# from langchain_core.messages import HumanMessage, SystemMessage # 暂时不需要，因为 PaymentAgent 不直接使用 LangChain 记忆
-# from langchain_core.prompts import ChatPromptTemplate # 暂时不需要
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, BaseMessage
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain.agents import AgentExecutor, create_tool_calling_agent, Tool
+from langchain.memory import ConversationBufferWindowMemory
+from langchain_community.chat_message_histories import RedisChatMessageHistory
+import redis
 
-from config import Config  # 导入 Config
-
-
-# LangGraph 状态定义（这里只定义 PaymentAgent 内部可能用到的部分，
-# 完整的 AgentState 会在 supervisor_agent.py 中定义）
-class AgentState(TypedDict):
-    """多智能体状态结构"""
-    user_id: str
-    session_id: str
-    current_agent: str
-    conversation_history: List[Dict[str, Any]]
-    order_info: Optional[Dict[str, Any]]
-    payment_info: Optional[Dict[str, Any]]
-    user_input: str
-    agent_response: str
-    error_message: Optional[str]
-    next_action: Optional[str]
+from config import Config
+from models import AgentState  # 使用统一的 AgentState
 
 
 # ----------------------------------------------------------------------
-# 以下是 PaymentAgent 内部的配置和 API 封装，直接放在这里以避免额外的文件依赖
+# 支付代理配置
 # ----------------------------------------------------------------------
 class PaymentConfig:
     """支付代理配置"""
@@ -42,21 +31,27 @@ class PaymentConfig:
     MODEL_TEMPERATURE: float = Config.LLM_TEMPERATURE
     MAX_TOKENS: int = 500
 
-    SUPPORTED_PAYMENT_METHODS: List[str] = ["alipay", "wechat", "unionpay"]
-    SUPPORTED_CURRENCIES: List[str] = ["CNY", "USD"]
+    # 简化配置：只支持模拟支付和CNY
+    SUPPORTED_PAYMENT_METHODS: List[str] = ["simulated"]
+    SUPPORTED_CURRENCIES: List[str] = ["CNY"]
     MAX_PAYMENT_AMOUNT: float = 10000.0
+    DEFAULT_PAYMENT_METHOD: str = "simulated"
+    DEFAULT_CURRENCY: str = "CNY"
 
 
+# ----------------------------------------------------------------------
+# 支付服务 API 封装（完整版本）
+# ----------------------------------------------------------------------
 class PaymentServiceAPI:
     """支付服务 API 封装"""
 
-    def __init__(self, base_url: str = "http://10.172.66.224:8084/payment"):  # 假设这个是外部支付服务的URL
+    def __init__(self, base_url: str = "http://10.172.66.224:8084/payment"):
         self.base_url = base_url
-        self.session = requests.Session()  # 使用 requests.Session 保持连接
+        self.session = requests.Session()
         self.session.timeout = 30
+        self.logger = logging.getLogger(__name__)
 
-    async def create_payment(self, order_id: str, user_id: str, amount: float, status: str = "PENDING") -> Dict[
-        str, Any]:
+    async def create_payment(self, order_id: str, user_id: str, amount: float, status: str = "PENDING") -> Dict[str, Any]:
         """创建新的支付"""
         url = f"{self.base_url}/api/payments"
         data = {
@@ -67,29 +62,23 @@ class PaymentServiceAPI:
         }
 
         try:
-            # 使用 asyncio.to_thread 包装同步的 requests 调用
             response = await asyncio.to_thread(self.session.post, url, json=data)
             response.raise_for_status()
             return {"success": True, "data": response.json()}
         except Exception as e:
-            logging.error(f"创建支付失败: {str(e)}")
+            self.logger.error(f"创建支付失败: {str(e)}")
             return {"success": False, "error": str(e)}
 
-    async def create_alipay_payment(self, out_trade_no: str, total_amount: float, subject: str) -> Dict[str, Any]:
-        """创建支付宝支付"""
-        url = f"{self.base_url}/api/payments/alipay"
-        data = {
-            "outTradeNo": out_trade_no,
-            "totalAmount": total_amount,
-            "subject": subject
-        }
-
+    async def get_all_payments(self) -> Dict[str, Any]:
+        """获取所有支付"""
+        url = f"{self.base_url}/api/payments"
+        
         try:
-            response = await asyncio.to_thread(self.session.post, url, json=data)
+            response = await asyncio.to_thread(self.session.get, url)
             response.raise_for_status()
             return {"success": True, "data": response.json()}
         except Exception as e:
-            logging.error(f"创建支付宝支付失败: {str(e)}")
+            self.logger.error(f"获取所有支付失败: {str(e)}")
             return {"success": False, "error": str(e)}
 
     async def get_payment_by_id(self, payment_id: str) -> Dict[str, Any]:
@@ -101,7 +90,7 @@ class PaymentServiceAPI:
             response.raise_for_status()
             return {"success": True, "data": response.json()}
         except Exception as e:
-            logging.error(f"获取支付信息失败: {str(e)}")
+            self.logger.error(f"获取支付信息失败: {str(e)}")
             return {"success": False, "error": str(e)}
 
     async def get_payments_by_user(self, user_id: str) -> Dict[str, Any]:
@@ -113,39 +102,266 @@ class PaymentServiceAPI:
             response.raise_for_status()
             return {"success": True, "data": response.json()}
         except Exception as e:
-            logging.error(f"获取用户支付信息失败: {str(e)}")
+            self.logger.error(f"获取用户支付信息失败: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+# TODO: 不确定是否有用，有用的话应该让微服务增加一个api
+    async def get_payments_by_order(self, order_id: str) -> Dict[str, Any]:
+        """根据订单 ID 获取支付记录"""
+        url = f"{self.base_url}/api/payments"
+        
+        try:
+            response = await asyncio.to_thread(self.session.get, url)
+            response.raise_for_status()
+            all_payments = response.json()
+            
+            # 过滤出指定订单的支付记录
+            if isinstance(all_payments, list):
+                order_payments = [p for p in all_payments if p.get("orderId") == order_id]
+            else:
+                order_payments = [all_payments] if all_payments.get("orderId") == order_id else []
+            
+            return {"success": True, "data": order_payments}
+        except Exception as e:
+            self.logger.error(f"获取订单支付信息失败: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    async def update_payment(self, payment_id: str, payment_data: Dict[str, Any]) -> Dict[str, Any]:
+        """更新支付"""
+        url = f"{self.base_url}/api/payments/{payment_id}"
+        
+        try:
+            response = await asyncio.to_thread(self.session.put, url, json=payment_data)
+            response.raise_for_status()
+            return {"success": True, "data": response.json()}
+        except Exception as e:
+            self.logger.error(f"更新支付失败: {str(e)}")
             return {"success": False, "error": str(e)}
 
     async def update_payment_status(self, payment_id: str, status: str) -> Dict[str, Any]:
         """更新支付状态"""
         url = f"{self.base_url}/api/payments/{payment_id}/status"
-        data = {"status": status}
-
+        
         try:
-            response = await asyncio.to_thread(self.session.patch, url, json=data)
+            response = await asyncio.to_thread(self.session.patch, url, json=status)
             response.raise_for_status()
             return {"success": True, "data": response.json()}
         except Exception as e:
-            logging.error(f"更新支付状态失败: {str(e)}")
+            self.logger.error(f"更新支付状态失败: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    async def delete_payment(self, payment_id: str) -> Dict[str, Any]:
+        """删除支付"""
+        url = f"{self.base_url}/api/payments/{payment_id}"
+        
+        try:
+            response = await asyncio.to_thread(self.session.delete, url)
+            response.raise_for_status()
+            return {"success": True, "data": response.json() if response.content else {}}
+        except Exception as e:
+            self.logger.error(f"删除支付失败: {str(e)}")
             return {"success": False, "error": str(e)}
 
 
 # ----------------------------------------------------------------------
+# 支付代理工具函数
+# ----------------------------------------------------------------------
+def create_payment_tool(payment_agent):
+    """创建支付订单工具"""
+    async def _create_payment(payment_data: str) -> str:
+        """创建支付订单，参数为JSON格式字符串"""
+        try:
+            # 解析JSON参数
+            try:
+                data = json.loads(payment_data)
+            except json.JSONDecodeError:
+                return "参数格式错误，请使用JSON格式：{\"order_id\": \"订单ID\", \"user_id\": \"用户ID\", \"amount\": 金额}"
+            
+            order_id = data.get("order_id")
+            user_id = data.get("user_id")
+            amount = data.get("amount")
+            
+            if not all([order_id, user_id, amount]):
+                return "缺少必要参数：order_id、user_id、amount"
+            
+            try:
+                amount = float(amount)
+            except (ValueError, TypeError):
+                return "金额必须是数字"
+            
+            result = await payment_agent.create_payment(order_id, user_id, amount)
+            
+            if result["success"]:
+                return f"支付创建成功：{json.dumps(result['data'], ensure_ascii=False)}"
+            else:
+                return f"支付创建失败：{result['error']}"
+                
+        except Exception as e:
+            return f"创建支付时发生错误：{str(e)}"
+    
+    return Tool(
+        name="create_payment_order",
+        func=_create_payment,
+        description="创建支付订单，参数为JSON格式：{\"order_id\": \"订单ID\", \"user_id\": \"用户ID\", \"amount\": 金额}"
+    )
 
+
+def query_payment_status_tool(payment_agent):
+    """查询支付状态工具"""
+    async def _query_payment_status(query_data: str) -> str:
+        """查询支付状态，支持通过支付ID或订单ID查询"""
+        try:
+            # 尝试解析JSON，如果失败则当作简单的ID处理
+            try:
+                data = json.loads(query_data)
+                payment_id = data.get("payment_id") or data.get("id")  # 兼容两种格式
+                order_id = data.get("order_id")
+            except json.JSONDecodeError:
+                # 如果不是JSON，当作支付ID处理
+                payment_id = query_data.strip()
+                order_id = None
+            
+            if payment_id:
+                # 通过支付ID查询
+                result = await payment_agent.payment_api.get_payment_by_id(payment_id)
+                
+                if result["success"]:
+                    payment_data = result["data"]
+                    status_text = payment_agent.payment_status_map.get(
+                        payment_data.get("status", "UNKNOWN"), 
+                        payment_data.get("status", "UNKNOWN")
+                    )
+                    return f"支付状态：{status_text}，详细信息：{json.dumps(payment_data, ensure_ascii=False)}"
+                else:
+                    return f"查询支付状态失败：{result['error']}"
+            
+            elif order_id:
+                # 通过订单ID查询
+                result = await payment_agent.payment_api.get_payments_by_order(order_id)
+                
+                if result["success"]:
+                    payments = result["data"]
+                    if payments:
+                        payment_data = payments[0]  # 取第一个支付记录
+                        status_text = payment_agent.payment_status_map.get(
+                            payment_data.get("status", "UNKNOWN"), 
+                            payment_data.get("status", "UNKNOWN")
+                        )
+                        return f"订单 {order_id} 的支付状态：{status_text}，详细信息：{json.dumps(payment_data, ensure_ascii=False)}"
+                    else:
+                        return f"订单 {order_id} 没有找到支付记录"
+                else:
+                    return f"查询订单支付状态失败：{result['error']}"
+            
+            else:
+                return "请提供支付ID或订单ID。格式：支付ID 或 {\"id\": \"支付ID\"} 或 {\"order_id\": \"订单ID\"}"
+                
+        except Exception as e:
+            return f"查询支付状态时发生错误：{str(e)}"
+    
+    return Tool(
+        name="query_payment_status",
+        func=_query_payment_status,
+        description="查询支付状态，参数：支付ID 或 JSON格式：{\"id\": \"支付ID\"} 或 {\"order_id\": \"订单ID\"}"
+    )
+
+
+def process_refund_tool(payment_agent):
+    """处理退款工具"""
+    async def _process_refund(refund_data: str) -> str:
+        """处理退款，参数为JSON格式字符串"""
+        try:
+            # 解析JSON参数
+            try:
+                data = json.loads(refund_data)
+            except json.JSONDecodeError:
+                # 如果不是JSON，尝试当作支付ID处理
+                data = {"id": refund_data.strip()}
+            
+            payment_id = data.get("payment_id") or data.get("id")  # 兼容两种格式
+            if not payment_id:
+                return "缺少必要参数：id（支付ID）"
+            
+            refund_reason = data.get("reason", "").strip()
+            if not refund_reason:
+                refund_reason = "用户申请退款"
+            
+            result = await payment_agent.process_refund(payment_id, refund_reason)
+            
+            if result["success"]:
+                return f"退款处理成功：{json.dumps(result['data'], ensure_ascii=False)}"
+            else:
+                return f"退款处理失败：{result['error']}"
+                
+        except Exception as e:
+            return f"处理退款时发生错误：{str(e)}"
+    
+    return Tool(
+        name="process_refund",
+        func=_process_refund,
+        description="处理退款，参数为JSON格式：{\"id\": \"支付ID\", \"reason\": \"退款原因（可选）\"}"
+    )
+
+
+def get_user_payments_tool(payment_agent):
+    """获取用户支付记录工具"""
+    async def _get_user_payments(user_id: str) -> str:
+        """获取用户支付记录"""
+        try:
+            result = await payment_agent.get_user_payments(user_id.strip())
+            
+            if result["success"]:
+                return f"用户支付记录：{json.dumps(result['data'], ensure_ascii=False)}"
+            else:
+                return f"获取用户支付记录失败：{result['error']}"
+                
+        except Exception as e:
+            return f"获取用户支付记录时发生错误：{str(e)}"
+    
+    return Tool(
+        name="get_user_payments",
+        func=_get_user_payments,
+        description="获取用户支付记录，参数：用户ID"
+    )
+
+
+def get_order_payments_tool(payment_agent):
+    """获取订单支付记录工具"""
+    async def _get_order_payments(order_id: str) -> str:
+        """获取订单支付记录"""
+        try:
+            result = await payment_agent.payment_api.get_payments_by_order(order_id.strip())
+            
+            if result["success"]:
+                return f"订单支付记录：{json.dumps(result['data'], ensure_ascii=False)}"
+            else:
+                return f"获取订单支付记录失败：{result['error']}"
+                
+        except Exception as e:
+            return f"获取订单支付记录时发生错误：{str(e)}"
+    
+    return Tool(
+        name="get_order_payments",
+        func=_get_order_payments,
+        description="获取订单支付记录，参数：订单ID"
+    )
+
+
+# ----------------------------------------------------------------------
+# 支付代理主类
+# ----------------------------------------------------------------------
 class PaymentAgent:
     """
     支付代理类 - 负责处理支付和退款相关业务
-    集成真实的支付服务 API 和第三方支付网关
+    集成真实的支付服务 API，使用模拟支付
     """
 
-    def __init__(self):  # 移除 config 参数，直接使用 Config
-        """
-        初始化支付代理
-        """
-        self.config = PaymentConfig()  # 使用内部 PaymentConfig
+    def __init__(self):
+        """初始化支付代理"""
+        self.config = PaymentConfig()
         self.logger = logging.getLogger(__name__)
 
-        # 初始化 LLM（仅用于复杂逻辑处理）
+        # 初始化 LLM
         self.llm = ChatOpenAI(
             api_key=self.config.SILICONFLOW_API_KEY,
             base_url=self.config.SILICONFLOW_BASE_URL,
@@ -156,7 +372,7 @@ class PaymentAgent:
         )
 
         # 初始化支付服务 API
-        self.payment_api = PaymentServiceAPI()  # 假设 PaymentServiceAPI 的 base_url 是固定的
+        self.payment_api = PaymentServiceAPI()
 
         # 支付状态映射
         self.payment_status_map = {
@@ -166,141 +382,123 @@ class PaymentAgent:
             "REFUNDED": "已退款",
             "REFUNDING": "退款中"
         }
+
+        # 初始化工具
+        self.tools = self._get_payment_tools()
+
+        # 创建 prompt 模板
+        self.prompt = ChatPromptTemplate.from_messages([
+            ("system", """你是专业的支付助手，负责处理支付相关的所有业务。你的能力包括：
+
+1. 💳 创建支付订单（自动成功）
+2. 📊 查询支付状态（支持支付ID或订单ID）
+3. 💰 处理退款申请
+4. 📋 获取用户支付记录
+5. 📦 获取订单支付记录
+
+工作特点：
+- 所有支付都是模拟的，使用CNY货币
+- 支付创建后会自动变为成功状态
+- 支持通过订单ID或支付ID查询状态
+- 退款原因可以为空，会使用默认原因
+
+工作流程：
+1. 仔细理解用户的支付需求
+2. 根据需求选择合适的工具
+3. 使用JSON格式传递参数给工具
+4. 如果信息不足，友好地询问用户补充
+5. 提供清晰、专业的回复
+
+注意事项：
+- 支付金额最大限制：{max_amount} CNY
+- 只支持模拟支付方式
+- 创建支付时需要：订单ID（order_id）、用户ID（user_id）、金额（amount）
+- 查询支付时可以使用：支付ID（id）或 订单ID（order_id）
+- 退款时需要：支付ID（id），退款原因可选（reason）
+
+数据字段说明：
+- 支付ID字段名：id
+- 订单ID字段名：orderId
+- 用户ID字段名：userId
+- 创建时间字段名：createAt
+- 更新时间字段名：updateAt
+
+请始终保持专业、友好的服务态度。""".format(
+                max_amount=self.config.MAX_PAYMENT_AMOUNT
+            )),
+            MessagesPlaceholder(variable_name="chat_history"),
+            ("human", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
+        ])
+
+        # 创建 agent
+        self.agent = create_tool_calling_agent(
+            llm=self.llm,
+            tools=self.tools,
+            prompt=self.prompt
+        )
+
         print("PaymentAgent initialized.")
+
+    def _get_payment_tools(self):
+        """获取支付工具列表"""
+        return [
+            create_payment_tool(self),
+            query_payment_status_tool(self),
+            process_refund_tool(self),
+            get_user_payments_tool(self),
+            get_order_payments_tool(self)  # 新增：获取订单支付记录
+        ]
+
+    async def _get_agent_executor(self, session_id: str) -> AgentExecutor:
+        """获取或创建 AgentExecutor 实例"""
+        message_history = RedisChatMessageHistory(
+            session_id=f"payment_{session_id}",
+            url=Config.REDIS_URL
+        )
+        
+        memory = ConversationBufferWindowMemory(
+            chat_memory=message_history,
+            memory_key="chat_history",
+            return_messages=True,
+            k=10
+        )
+        
+        return AgentExecutor(
+            agent=self.agent,
+            tools=self.tools,
+            verbose=True,
+            memory=memory,
+            handle_parsing_errors=True
+        )
 
     async def process_message(self, user_input: str, session_id: str) -> str:
         """
-        处理用户消息并返回 Agent 的响应。
-        注意：PaymentAgent 原本没有 LangChain AgentExecutor 结构，
-        这里为了兼容 LangGraph 节点，直接返回一个模拟响应。
-        如果 PaymentAgent 内部也需要 LLM 驱动的复杂逻辑，
-        则需要像 GuideAgent 或 OrderAgent 那样构建 AgentExecutor。
+        处理用户消息并返回 Agent 的响应
         """
         self.logger.info(f"PaymentAgent 收到消息: {user_input} (Session: {session_id})")
-        # 这里可以根据 user_input 简单判断意图并调用内部方法
-        # 例如：
-        if "支付" in user_input and "创建" in user_input:
-            # 假设从 user_input 中解析出 order_id, user_id, amount
-            # 这部分通常由 LLM 或更复杂的解析器完成
-            # 为了演示，我们直接返回一个模拟结果
-            return "PaymentAgent: 收到创建支付请求，但需要更多信息（如订单ID、金额）。"
-        elif "退款" in user_input:
-            return "PaymentAgent: 收到退款请求，但需要支付ID和退款金额。"
-        elif "状态" in user_input and "支付" in user_input:
-            return "PaymentAgent: 收到查询支付状态请求，但需要支付ID。"
-        else:
-            return "PaymentAgent: 我是支付助手，请问您有什么支付或退款相关的问题？"
-
-    # 以下是 PaymentAgent 原有的业务逻辑方法，供 LangGraph 节点或内部调用
-    async def process_payment_request(self, state: AgentState) -> AgentState:
-        """
-        处理支付请求（LangGraph 节点函数）
-        """
+        
         try:
-            payment_info = state.get("payment_info", {})
-            order_info = state.get("order_info", {})
-
-            if not payment_info or not order_info:
-                state["error_message"] = "缺少支付或订单信息"
-                state["next_action"] = "request_missing_info"
-                return state
-
-            # 创建支付
-            result = await self.create_payment(
-                order_id=order_info.get("order_id"),
-                user_id=state["user_id"],
-                amount=payment_info.get("amount"),
-                payment_method=payment_info.get("payment_method", "alipay")
-            )
-
-            if result["success"]:
-                state["payment_info"].update(result["data"])
-                state["agent_response"] = f"支付创建成功，支付ID: {result['data']['payment_id']}"
-                state["next_action"] = "notify_order_agent"
-            else:
-                state["error_message"] = result["error"]
-                state["next_action"] = "handle_payment_error"
-
+            agent_executor = await self._get_agent_executor(session_id)
+            
+            # 调用 AgentExecutor
+            response = await agent_executor.ainvoke({"input": user_input})
+            
+            output = response.get("output", "PaymentAgent: 抱歉，我无法处理您的请求。")
+            self.logger.info(f"PaymentAgent 响应: {output}")
+            
+            return output
+            
         except Exception as e:
-            self.logger.error(f"处理支付请求失败: {str(e)}")
-            state["error_message"] = str(e)
-            state["next_action"] = "handle_payment_error"
+            self.logger.error(f"PaymentAgent 处理消息失败: {str(e)}")
+            return f"PaymentAgent: 抱歉，处理您的请求时发生错误：{str(e)}"
 
-        return state
-
-    async def process_refund_request(self, state: AgentState) -> AgentState:
-        """
-        处理退款请求（LangGraph 节点函数）
-        """
-        try:
-            payment_info = state.get("payment_info", {})
-
-            if not payment_info.get("payment_id"):
-                state["error_message"] = "缺少支付ID"
-                state["next_action"] = "request_payment_id"
-                return state
-
-            # 处理退款
-            result = await self.process_refund(
-                payment_id=payment_info["payment_id"],
-                refund_amount=payment_info.get("refund_amount"),
-                refund_reason=payment_info.get("refund_reason", "用户申请退款")
-            )
-
-            if result["success"]:
-                state["payment_info"].update(result["data"])
-                state["agent_response"] = f"退款申请成功，退款ID: {result['data']['refund_id']}"
-                state["next_action"] = "notify_order_agent"
-            else:
-                state["error_message"] = result["error"]
-                state["next_action"] = "handle_refund_error"
-
-        except Exception as e:
-            self.logger.error(f"处理退款请求失败: {str(e)}")
-            state["error_message"] = str(e)
-            state["next_action"] = "handle_refund_error"
-
-        return state
-
-    async def check_payment_status(self, state: AgentState) -> AgentState:
-        """
-        查询支付状态（LangGraph 节点函数）
-        """
-        try:
-            payment_info = state.get("payment_info", {})
-            payment_id = payment_info.get("payment_id")
-
-            if not payment_id:
-                state["error_message"] = "缺少支付ID"
-                state["next_action"] = "request_payment_id"
-                return state
-
-            # 查询支付状态
-            result = await self.payment_api.get_payment_by_id(payment_id)
-
-            if result["success"]:
-                payment_data = result["data"]
-                status_text = self.payment_status_map.get(payment_data["status"], payment_data["status"])
-
-                state["agent_response"] = f"支付状态：{status_text}"
-                state["payment_info"].update(payment_data)
-                state["next_action"] = "return_to_comm_agent"
-            else:
-                state["error_message"] = result["error"]
-                state["next_action"] = "handle_query_error"
-
-        except Exception as e:
-            self.logger.error(f"查询支付状态失败: {str(e)}")
-            state["error_message"] = str(e)
-            state["next_action"] = "handle_query_error"
-
-        return state
-
-    async def create_payment(self, order_id: str, user_id: str, amount: float, payment_method: str = "alipay") -> Dict[
-        str, Any]:
-        """
-        创建支付订单
-        """
+    # ----------------------------------------------------------------------
+    # 业务逻辑方法（适配 models.py 的 AgentState）
+    # ----------------------------------------------------------------------
+    
+    async def create_payment(self, order_id: str, user_id: str, amount: float) -> Dict[str, Any]:
+        """创建支付订单（简化版，自动成功）"""
         try:
             # 验证支付金额
             if amount <= 0:
@@ -308,10 +506,6 @@ class PaymentAgent:
 
             if amount > self.config.MAX_PAYMENT_AMOUNT:
                 return {"success": False, "error": f"支付金额超过限额 {self.config.MAX_PAYMENT_AMOUNT}"}
-
-            # 验证支付方式
-            if payment_method not in self.config.SUPPORTED_PAYMENT_METHODS:
-                return {"success": False, "error": f"不支持的支付方式: {payment_method}"}
 
             # 创建支付订单
             payment_result = await self.payment_api.create_payment(
@@ -324,52 +518,45 @@ class PaymentAgent:
             if not payment_result["success"]:
                 return payment_result
 
-            payment_id = payment_result["data"].get("id")
-
-            # 根据支付方式创建具体的支付
-            if payment_method == "alipay":
-                out_trade_no = f"PAY_{payment_id}_{int(time.time())}"
-                alipay_result = await self.payment_api.create_alipay_payment(
-                    out_trade_no=out_trade_no,
-                    total_amount=amount,
-                    subject=f"订单支付-{order_id}"
-                )
-
-                if alipay_result["success"]:
-                    return {
-                        "success": True,
-                        "data": {
-                            "payment_id": payment_id,
-                            "out_trade_no": out_trade_no,
-                            "payment_url": alipay_result["data"].get("payment_url"),
-                            "qr_code": alipay_result["data"].get("qr_code"),
-                            "amount": amount,
-                            "status": "PENDING"
-                        }
-                    }
-                else:
-                    return alipay_result
-            else:
-                # 其他支付方式的处理逻辑
+            payment_id = payment_result["data"].get("id")  # 使用 "id" 而不是 "payment_id"
+            
+            # 关键修复：立即将支付状态更新为成功
+            success_result = await self.payment_api.update_payment_status(payment_id, "SUCCESS")
+            
+            if success_result["success"]:
+                # 直接使用API返回的数据，只添加必要的业务信息
+                final_payment_data = success_result["data"].copy()
+                
+                # 只添加API可能没有返回的关键业务信息
+                final_payment_data.update({
+                    "payment_time": datetime.now().isoformat(),
+                    "message": "模拟支付已完成"
+                })
+                
+                self.logger.info(f"模拟支付成功创建并完成: {payment_id} - {amount} CNY")
+                
                 return {
                     "success": True,
-                    "data": {
-                        "payment_id": payment_id,
-                        "amount": amount,
-                        "status": "PENDING",
-                        "payment_method": payment_method
-                    }
+                    "data": final_payment_data
+                }
+            else:
+                # 如果更新状态失败，返回原始创建结果，并添加警告信息
+                self.logger.warning(f"支付创建成功但状态更新失败: {payment_id}")
+                original_data = payment_result["data"].copy()
+                original_data.update({
+                    "warning": "支付已创建但状态更新失败，请稍后查询状态"
+                })
+                return {
+                    "success": True,
+                    "data": original_data
                 }
 
         except Exception as e:
             self.logger.error(f"创建支付失败: {str(e)}")
             return {"success": False, "error": str(e)}
 
-    async def process_refund(self, payment_id: str, refund_amount: Optional[float] = None,
-                             refund_reason: str = "用户申请退款") -> Dict[str, Any]:
-        """
-        处理退款
-        """
+    async def process_refund(self, payment_id: str, refund_reason: str = "用户申请退款") -> Dict[str, Any]:
+        """处理退款"""
         try:
             # 获取原支付信息
             payment_result = await self.payment_api.get_payment_by_id(payment_id)
@@ -380,136 +567,57 @@ class PaymentAgent:
             payment_data = payment_result["data"]
 
             # 验证支付状态
-            if payment_data["status"] not in ["SUCCESS"]:
+            if payment_data.get("status") not in ["SUCCESS"]:
                 return {"success": False, "error": "只有成功的支付才能退款"}
 
-            # 确定退款金额
-            original_amount = float(payment_data["amount"])
-            actual_refund_amount = refund_amount if refund_amount is not None else original_amount
-
-            if actual_refund_amount <= 0 or actual_refund_amount > original_amount:
-                return {"success": False, "error": "退款金额无效"}
-
-            # 生成退款ID
-            refund_id = f"REF_{payment_id}_{int(time.time())}"
-
             # 更新支付状态为退款中
-            status_result = await self.payment_api.update_payment_status(payment_id, "REFUNDING")
+            refund_result = await self.payment_api.update_payment_status(payment_id, "REFUNDING")
 
-            if not status_result["success"]:
-                return status_result
-
-            # 这里应该调用真实的第三方支付退款 API
-            # 模拟退款处理
-            refund_success = await self._process_third_party_refund(payment_data, actual_refund_amount, refund_reason)
-
-            if refund_success:
-                # 更新支付状态为已退款
-                await self.payment_api.update_payment_status(payment_id, "REFUNDED")
-
+            if refund_result["success"]:
+                self.logger.info(f"退款申请已提交: {payment_id}, 原因: {refund_reason}")
+                
+                # 模拟退款处理完成
+                final_result = await self.payment_api.update_payment_status(payment_id, "REFUNDED")
+                
                 return {
                     "success": True,
                     "data": {
-                        "refund_id": refund_id,
-                        "payment_id": payment_id,
-                        "refund_amount": actual_refund_amount,
+                        "id": payment_id,  # 使用 "id" 而不是 "payment_id"
                         "refund_reason": refund_reason,
                         "status": "REFUNDED",
-                        "refund_time": datetime.now().isoformat()
+                        "refund_time": datetime.now().isoformat(),
+                        "message": "退款处理完成"
                     }
                 }
             else:
-                # 退款失败，恢复支付状态
-                await self.payment_api.update_payment_status(payment_id, "SUCCESS")
-                return {"success": False, "error": "第三方退款处理失败"}
+                return refund_result
 
         except Exception as e:
             self.logger.error(f"处理退款失败: {str(e)}")
             return {"success": False, "error": str(e)}
 
-    async def _process_third_party_refund(self, payment_data: Dict[str, Any], refund_amount: float,
-                                          refund_reason: str) -> bool:
-        """
-        处理第三方支付退款（模拟）
-        """
-        # 这里应该根据不同的支付方式调用相应的第三方退款 API
-        # 目前模拟处理
-        try:
-            # 模拟退款成功
-            await asyncio.sleep(0.1)  # 模拟网络延迟
-            return True
-        except Exception as e:
-            self.logger.error(f"第三方退款失败: {str(e)}")
-            return False
-
-    async def handle_payment_callback(self, callback_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        处理支付回调
-        """
-        try:
-            # 验证回调数据
-            if not self._verify_callback_signature(callback_data):
-                return {"success": False, "error": "回调验证失败"}
-
-            payment_id = callback_data.get("payment_id")
-            status = callback_data.get("status")
-
-            if not payment_id or not status:
-                return {"success": False, "error": "回调数据不完整"}
-
-            # 更新支付状态
-            result = await self.payment_api.update_payment_status(payment_id, status)
-
-            if result["success"]:
-                self.logger.info(f"支付回调处理成功: {payment_id} -> {status}")
-
-                # 通知其他系统（订单系统等）
-                await self._notify_other_systems(payment_id, status)
-
-                return {"success": True, "message": "回调处理成功"}
-            else:
-                return result
-
-        except Exception as e:
-            self.logger.error(f"处理支付回调失败: {str(e)}")
-            return {"success": False, "error": str(e)}
-
-    async def _verify_callback_signature(self, callback_data: Dict[str, Any]) -> bool:
-        """
-        验证回调签名
-        """
-        # 这里应该实现真实的签名验证逻辑
-        # 目前模拟验证成功
-        return True
-
-    async def _notify_other_systems(self, payment_id: str, status: str):
-        """
-        通知其他系统
-        """
-        # 这里应该通知订单系统等其他系统
-        # 可以通过消息队列、HTTP 请求等方式
-        self.logger.info(f"通知其他系统: 支付 {payment_id} 状态更新为 {status}")
-
     async def get_user_payments(self, user_id: str) -> Dict[str, Any]:
-        """
-        获取用户的支付记录
-        """
+        """获取用户的支付记录"""
         try:
             result = await self.payment_api.get_payments_by_user(user_id)
 
             if result["success"]:
                 # 格式化支付记录
                 payments = result["data"]
+                if not isinstance(payments, list):
+                    payments = [payments] if payments else []
+                
                 formatted_payments = []
 
                 for payment in payments:
                     formatted_payment = {
-                        "payment_id": payment["id"],
-                        "order_id": payment["orderId"],
-                        "amount": payment["amount"],
-                        "status": self.payment_status_map.get(payment["status"], payment["status"]),
-                        "create_time": payment.get("createTime", ""),
-                        "update_time": payment.get("updateTime", "")
+                        "id": payment.get("id"),  # 使用 "id" 而不是 "payment_id"
+                        "orderId": payment.get("orderId"),  # 保持与API一致
+                        "userId": payment.get("userId"),    # 保持与API一致
+                        "amount": payment.get("amount"),
+                        "status": self.payment_status_map.get(payment.get("status"), payment.get("status")),
+                        "createAt": payment.get("createAt", ""),  # 使用 "createAt"
+                        "updateAt": payment.get("updateAt", "")   # 使用 "updateAt"
                     }
                     formatted_payments.append(formatted_payment)
 
@@ -524,42 +632,66 @@ class PaymentAgent:
             self.logger.error(f"获取用户支付记录失败: {str(e)}")
             return {"success": False, "error": str(e)}
 
-    # 兼容性方法（保持与现有代码的兼容）
+    async def delete_payment(self, payment_id: str) -> Dict[str, Any]:
+        """删除支付记录"""
+        try:
+            result = await self.payment_api.delete_payment(payment_id)
+            
+            if result["success"]:
+                self.logger.info(f"支付记录已删除: {payment_id}")
+                return {
+                    "success": True,
+                    "message": f"支付记录 {payment_id} 已成功删除"
+                }
+            else:
+                return result
+                
+        except Exception as e:
+            self.logger.error(f"删除支付记录失败: {str(e)}")
+            return {"success": False, "error": str(e)}
+        
+    # 兼容性方法
     async def process_request(self, user_input: str) -> str:
-        """
-        处理用户请求（兼容性方法）
-
-        Args:
-            user_input: 用户输入
-
-        Returns:
-            str: 处理结果
-        """
-        # 这个方法主要用于向后兼容，实际使用中应该通过 LangGraph 调用
-        # 为了演示，这里简单地将用户输入传递给 process_message
+        """处理用户请求（兼容性方法）"""
         return await self.process_message(user_input, "compatibility_session")
 
     def get_payment_help(self) -> str:
-        """
-        获取支付帮助信息
-
-        Returns:
-            str: 帮助信息
-        """
+        """获取支付帮助信息"""
         help_text = f"""
         支付代理功能说明：
 
         🔧 核心功能：
-        1. 💳 创建支付订单
-        2. 💰 处理退款申请
-        3. 📊 查询支付状态
-        4. 🔔 处理支付回调
+        1. 💳 创建支付订单（自动成功）
+        2. 📊 查询支付状态（支持支付ID或订单ID）
+        3. 💰 处理退款申请
+        4. 📋 获取用户支付记录
+        5. 📦 获取订单支付记录
 
-        📋 支持的支付方式：{', '.join(self.config.SUPPORTED_PAYMENT_METHODS)}
-        💱 支持的币种：{', '.join(self.config.SUPPORTED_CURRENCIES)}
-        💰 最大支付金额：{self.config.MAX_PAYMENT_AMOUNT}
+        💱 支付配置：
+        - 支付方式：{self.config.DEFAULT_PAYMENT_METHOD}（模拟支付）
+        - 支持币种：{self.config.DEFAULT_CURRENCY}
+        - 最大支付金额：{self.config.MAX_PAYMENT_AMOUNT}
 
-        ⚠️ 注意：此代理仅处理支付相关逻辑，用户交互由 comm_agent 负责
+        📋 工具说明：
+        - create_payment_order: 创建支付订单，需要订单ID、用户ID、金额
+        - query_payment_status: 查询支付状态，支持支付ID或订单ID
+        - process_refund: 处理退款申请，需要支付ID，退款原因可选
+        - get_user_payments: 获取用户所有支付记录
+        - get_order_payments: 获取指定订单的支付记录
+
+        🔤 数据字段规范：
+        - 支付ID：id
+        - 订单ID：orderId  
+        - 用户ID：userId
+        - 创建时间：createAt
+        - 更新时间：updateAt
+
+        ⚠️ 注意：
+        - 所有支付都是模拟的，创建后自动成功
+        - 支持通过订单ID或支付ID查询状态
+        - 退款原因可以为空，会使用默认原因
+        - 此代理集成了大模型理解能力，能够智能解析用户自然语言输入
+        - 与微服务API数据格式完全一致
         """
         return help_text
 
