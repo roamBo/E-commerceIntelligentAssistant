@@ -1,4 +1,3 @@
-# reorganized/agents/order_agent.py
 import os
 import json
 import asyncio
@@ -11,16 +10,22 @@ load_dotenv()
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, BaseMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.agents import AgentExecutor, Tool
-from langchain.agents.format_scratchpad import format_to_openai_functions
-from langchain.agents.output_parsers import OpenAIFunctionsAgentOutputParser
-from langchain_community.chat_message_histories import ChatMessageHistory
+from langchain.agents import AgentExecutor, Tool, create_tool_calling_agent
+from langchain.memory import ConversationBufferWindowMemory
+from langchain_community.chat_message_histories import RedisChatMessageHistory
 import redis
-from reorganized.config import Config
+
+# 修正导入路径，确保能正确导入 config
+# 如果 config.py 在项目根目录，而 agents 目录是其子目录，则需要这样调整
+# 否则，请根据您的实际项目结构调整 sys.path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.abspath(os.path.join(current_dir, '..'))
+import sys
+sys.path.append(project_root)
+
+from config import Config
 
 print(f"Config.REDIS_URL: {Config.REDIS_URL}")
-
-# 后续代码保持不变
 
 # 模拟订单数据库
 orders = {}
@@ -34,7 +39,7 @@ def create_order(input: str) -> str:
         product_name, quantity, address, payment_method = input.split(',', 3)
         quantity = int(quantity.strip())
     except ValueError:
-        return "参数格式错误，请使用：商品名称,数量,收货地址,支付方式"
+        return "参数格式错误，请使用：商品名称,数量，收货地址，支付方式"
 
     order_id = f"ORD-{hash(product_name + address) % 1000000:06d}"
     orders[order_id] = {
@@ -144,19 +149,9 @@ def get_order_tools():
 
 # ----------------------------------------------------------------------
 
-# Redis 客户端，使用 Config 中的 REDIS_URL
-# 注意：这里假设 OrderAgent 内部的 Redis 客户端是独立的，
-# 并且每个 session_id 对应一个独立的 chat_history key。
-parsed_redis_url = urlparse(Config.REDIS_URL)
-redis_client = redis.Redis(
-    host=parsed_redis_url.hostname,
-    port=parsed_redis_url.port,
-    db=int(parsed_redis_url.path.lstrip('/')) if parsed_redis_url.path else 0,
-    password=parsed_redis_url.password if parsed_redis_url.password else None
-)
-
-
 class OrderAgent:
+    _agent_executors_cache: Dict[str, AgentExecutor] = {} # 新增缓存
+
     def __init__(self):
         self.llm = ChatOpenAI(
             api_key=Config.SILICONFLOW_API_KEY,
@@ -165,7 +160,6 @@ class OrderAgent:
             temperature=Config.LLM_TEMPERATURE
         )
         self.tools = get_order_tools()  # 使用 OrderAgent 自己的工具
-        # self.message_history 在 process_message 中按 session_id 动态加载
         system_message_str = "你是一个订单处理助手，负责解答用户的订单问题：1. 支持查询订单状态、物流信息、预计送达时间等。创建订单时默认状态为未支付。2. 当用户询问物流时，自动调用LogisticsQuery工具（需先确认订单ID)。3. 支持创建、修改、取消、退款订单，查询订单状态，标记订单为已支付。4. 无法回答的问题直接告知用户。5. 对话简洁友好，每次回复不超过3句话。"
         system_message = SystemMessage(content=system_message_str)
         self.prompt = ChatPromptTemplate.from_messages([
@@ -174,84 +168,66 @@ class OrderAgent:
             ("human", "{input}"),
             MessagesPlaceholder(variable_name="agent_scratchpad")
         ])
-        # self.agent 在 process_message 中按 session_id 动态创建或更新
         print("OrderAgent initialized.")
 
-    def _tools_to_functions(self) -> list:
-        # 适配 LangChain 0.1.x 的函数绑定方式
-        return [{
-            "name": tool.name,
-            "description": tool.description,
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "input": {"type": "string", "description": "工具输入参数"}
-                },
-                "required": ["input"]
-            }
-        } for tool in self.tools]
+    async def _get_agent_executor(self, session_id: str) -> AgentExecutor:
+        """
+        根据 session_id 获取或创建 AgentExecutor 实例。
+        """
+        if session_id not in self._agent_executors_cache:
+            print(f"--- 为新会话创建 OrderAgent Executor: {session_id} ---")
+            message_history = RedisChatMessageHistory(
+                session_id=f"order_agent_history:{session_id}", # 确保 session_id 唯一
+                url=Config.REDIS_URL
+            )
+            memory = ConversationBufferWindowMemory(
+                chat_memory=message_history,
+                memory_key="chat_history",
+                return_messages=True,
+                k=5
+            )
+            executor = AgentExecutor(
+                agent=create_tool_calling_agent(
+                    llm=self.llm,
+                    tools=self.tools,
+                    prompt=self.prompt
+                ),
+                tools=self.tools,
+                verbose=True,
+                memory=memory
+            )
+            self._agent_executors_cache[session_id] = executor
+        else:
+            print(f"--- 使用现有 OrderAgent Executor: {session_id} ---")
+        return self._agent_executors_cache[session_id]
 
     async def process_message(self, user_input: str, session_id: str) -> str:
         """
         处理用户消息并返回 Agent 的响应。
         """
-        # 每次调用时，加载当前 session 的历史，并创建 AgentExecutor
-        message_history_for_session = self._load_chat_history(session_id)
-
-        # 重新初始化 AgentExecutor，确保使用最新的 chat_history
-        # 注意：这里每次都重新创建 AgentExecutor，效率较低，
-        # 更优方案是修改 OrderAgent 内部，使其支持 LangChain 的 ConversationBufferWindowMemory
-        # 但为了“尽可能不修改原有代码”，我们采取这种适配方式。
-        agent_executor = self._initialize_agent(message_history_for_session.messages)
+        agent_executor = await self._get_agent_executor(session_id)
 
         try:
-            message_history_for_session.add_user_message(user_input)
-            # 使用 ainvoke 进行异步调用
+            # 调用 AgentExecutor
+            # 【修正】移除 chat_history: []，让 memory 自动管理
             response = await agent_executor.ainvoke({"input": user_input})
-
             output = response.get("output", "未能生成有效响应")
-            message_history_for_session.add_ai_message(output)
-            self._save_chat_history(session_id, message_history_for_session.messages)
+
+            # 【临时调试】强制确保返回字符串，并打印类型
+            if not isinstance(output, str):
+                print(f"WARNING: OrderAgent.process_message received non-string output: {output}, type: {type(output)}")
+                output = str(output) if output is not None else "OrderAgent 返回了非字符串结果。"
+
+            print(f"DEBUG: OrderAgent.process_message returning: {output}, type: {type(output)}")
             return output
         except Exception as e:
             error_msg = f"处理请求时出错: {str(e)}"
-            message_history_for_session.add_ai_message(error_msg)
-            self._save_chat_history(session_id, message_history_for_session.messages)
+            print(f"DEBUG: OrderAgent.process_message error: {error_msg}")
             return error_msg
 
-    def _save_chat_history(self, session_id: str, messages: List[BaseMessage]):
-        try:
-            redis_key = f'order_chat_history:{session_id}'  # 区分 key
-            history = []
-            for message in messages:
-                if isinstance(message, HumanMessage):
-                    history.append({"type": "human", "data": {"content": message.content}})
-                elif isinstance(message, AIMessage):
-                    history.append({"type": "ai", "data": {"content": message.content}})
-            redis_client.set(redis_key, json.dumps(history))
-        except Exception as e:
-            print(f"保存对话历史失败: {str(e)}")
-
-    def _load_chat_history(self, session_id: str) -> ChatMessageHistory:
-        """从 Redis 加载指定 session_id 的对话历史"""
-        message_history = ChatMessageHistory()
-        try:
-            redis_key = f'order_chat_history:{session_id}'  # 区分 key
-            history_data = redis_client.get(redis_key)
-            if history_data:
-                history = json.loads(history_data)
-                for item in history:
-                    if item["type"] == "human":
-                        message_history.add_user_message(item["data"]["content"])
-                    elif item["type"] == "ai":
-                        message_history.add_ai_message(item["data"]["content"])
-        except Exception as e:
-            print(f"加载对话历史失败: {str(e)}")
-        return message_history
-
-    def clear_chat_history(self, session_id: str):
-        try:
-            redis_key = f'order_chat_history:{session_id}'  # 区分 key
-            redis_client.delete(redis_key)
-        except Exception as e:
-            print(f"清除对话历史失败: {str(e)}")
+order_agent_instance: Optional['OrderAgent'] = None
+async def get_order_agent() -> 'OrderAgent':
+    global order_agent_instance
+    if order_agent_instance is None:
+        order_agent_instance = OrderAgent()
+    return order_agent_instance

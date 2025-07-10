@@ -1,4 +1,3 @@
-# agents/guide_agent.py
 import os
 from typing import Dict, Any, Optional
 
@@ -9,7 +8,13 @@ from langchain.memory import ConversationBufferWindowMemory
 from langchain_community.chat_message_histories import RedisChatMessageHistory
 
 import sys
-sys.path.append("..")
+# 修正导入路径，确保能正确导入 config
+# 如果 config.py 在项目根目录，而 agents 目录是其子目录，则需要这样调整
+# 否则，请根据您的实际项目结构调整 sys.path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.abspath(os.path.join(current_dir, '..'))
+sys.path.append(project_root)
+
 from config import Config
 from tools import search_products, format_final_response  # 导入工具
 
@@ -55,9 +60,9 @@ class GuideAgent:
         根据 session_id 获取或创建 AgentExecutor 实例。
         """
         if session_id not in self._agent_executors_cache:
-            print(f"--- 为新会话创建 AgentExecutor: {session_id} ---")
+            print(f"--- 为新会话创建 GuideAgent Executor: {session_id} ---")
             message_history = RedisChatMessageHistory(
-                session_id=session_id,
+                session_id=f"guide_agent_history:{session_id}", # 确保 session_id 唯一
                 url=Config.REDIS_URL
             )
             memory = ConversationBufferWindowMemory(
@@ -74,7 +79,7 @@ class GuideAgent:
             )
             self._agent_executors_cache[session_id] = executor
         else:
-            print(f"--- 使用现有 AgentExecutor: {session_id} ---")
+            print(f"--- 使用现有 GuideAgent Executor: {session_id} ---")
         return self._agent_executors_cache[session_id]
 
     async def process_message(self, user_input: str, session_id: str) -> str:
@@ -84,10 +89,25 @@ class GuideAgent:
         """
         agent_executor = await self._get_agent_executor(session_id)
 
-        # 调用 AgentExecutor
-        response = await agent_executor.ainvoke({"input": user_input, "chat_history": []})
-        final_report = response['output']
-        return final_report
+        try:
+            # 调用 AgentExecutor
+            # 【修正】移除 chat_history: []，让 memory 自动管理
+            response = await agent_executor.ainvoke({"input": user_input})
+            final_report = response.get('output', "未能生成有效响应")
+
+            # 【临时调试】强制确保返回字符串，并打印类型
+            if not isinstance(final_report, str):
+                print(f"WARNING: GuideAgent.process_message received non-string output: {final_report}, type: {type(final_report)}")
+                # 尝试转换为字符串，或者返回一个默认错误消息
+                final_report = str(final_report) if final_report is not None else "GuideAgent 返回了非字符串结果。"
+
+            print(f"DEBUG: GuideAgent.process_message returning: {final_report}, type: {type(final_report)}")
+
+            return final_report
+        except Exception as e:
+            error_msg = f"处理请求时出错: {str(e)}"
+            print(f"DEBUG: GuideAgent.process_message error: {error_msg}")
+            return error_msg
 
 
 # 全局 GuideAgent 实例
