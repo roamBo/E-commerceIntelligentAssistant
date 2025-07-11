@@ -51,7 +51,7 @@ async def lifespan(app: FastAPI):
             from services.product_api_client import get_product_api_client
             product_client = await get_product_api_client()
             # 尝试调用一个简单的API，例如查询所有可用商品，以验证连接
-            await product_client.search_available_products()
+            # await product_client.search_available_products()
             logger.info(f"✅ 成功连接到商品 API: {Config.PRODUCT_API_BASE_URL}")
         except Exception as e:
             raise RuntimeError(f"❌ API 启动失败：无法连接到商品 API: {Config.PRODUCT_API_BASE_URL}. 错误详情: {e}")
@@ -82,8 +82,7 @@ app = FastAPI(
 
 # CORS 配置
 origins = [
-    "http://localhost",
-    "http://localhost:5173", # Vue 前端开发服务器的地址
+    "*"
 ]
 
 app.add_middleware(
@@ -114,4 +113,4 @@ async def chat_endpoint(request: ChatRequest):
 
 # --- 运行 FastAPI 应用 ---
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000) # 端口改为 8000，避免与之前 8085 冲突
+    uvicorn.run(app, host="0.0.0.0", port=8085) # 端口改为 8000，避免与之前 8085 冲突
