@@ -1,0 +1,23 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: product-service
+
+  cloud:
+    nacos:
+      discovery:
+        server-addr: nacos:8848
+        enabled: false
+
+  elasticsearch:
+    uris: http://elasticsearch:9200
+    connection-timeout: 30s
+    socket-timeout: 30s
+    # username: elastic
+    # password: changeme
+
+logging:
+  level:
+    org.springframework.data.elasticsearch: DEBUG
