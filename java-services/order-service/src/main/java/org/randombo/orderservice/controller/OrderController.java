@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Optional;
 import jakarta.validation.Valid;
 
+@CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/api/orders") // 定义基础路径
 public class OrderController {

@@ -1,7 +1,7 @@
 services:
   mysql:
     image: mysql:8
-    container_name: mysql
+    container_name: mysql-test
     environment:
       MYSQL_ROOT_PASSWORD: Longquan1
     ports:
@@ -14,7 +14,7 @@ services:
 
   nacos:
     image: nacos/nacos-server:v2.2.0-slim
-    container_name: nacos
+    container_name: nacos-test
     ports:
       - "8848:8848"
     volumes:
@@ -23,12 +23,17 @@ services:
       - backend
     environment:
       - MODE=standalone
-      - PREFER_HOST_MODE=hostname
+      - SPRING_DATASOURCE_PLATFORM=mysql
+      - MYSQL_MASTER_HOST=mysql-test
+      - MYSQL_MASTER_PORT=3306
+      - MYSQL_MASTER_USER=root
+      - MYSQL_MASTER_PASSWORD=Longquan1
+      - MYSQL_MASTER_DB_NAME=nacos_config
       - TZ=Asia/Shanghai
 
   redis:
     image: redis:6
-    container_name: redis
+    container_name: redis-test
     ports:
       - "6379:6379"
     volumes:
@@ -38,7 +43,7 @@ services:
 
   elasticsearch:
     image: elasticsearch:7.17.14
-    container_name: elasticsearch
+    container_name: elasticsearch-test
     environment:
       - discovery.type=single-node
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
@@ -82,6 +87,19 @@ services:
     depends_on:
       - elasticsearch
       - nacos
+  services-gateway:
+    build:
+      context: ./services-gateway
+    container_name: services-gateway
+    ports:
+      - "8084:8084"
+    depends_on:
+      - nacos
+      - order-service
+      - product-service
+      - payment-service
+    networks:
+      - backend
 
 networks:
   backend:
