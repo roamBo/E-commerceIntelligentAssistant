@@ -6,19 +6,15 @@ import json
 import time
 from datetime import datetime
 from typing import Dict, Any, Optional, List
-from urllib.parse import urlparse
 
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, BaseMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.agents import AgentExecutor, create_tool_calling_agent, Tool
-from langchain.memory import ConversationBufferWindowMemory
-from langchain_community.chat_message_histories import RedisChatMessageHistory
-import redis
 
+# 【修改】移除了 ConversationBufferWindowMemory 和 RedisChatMessageHistory
 from config import Config
-from models import AgentState  # 使用统一的 AgentState
-
+from models import AgentState
 
 # ----------------------------------------------------------------------
 # 支付代理配置
@@ -356,13 +352,21 @@ class PaymentAgent:
     集成真实的支付服务 API，使用模拟支付
     """
 
+    _agent_executor: Optional[AgentExecutor] = None
+
     def __init__(self):
-        """初始化支付代理"""
+        """
+        【修改】: 在 __init__ 中创建一个单一的、不带 memory 的 AgentExecutor 实例。
+        """
         self.config = PaymentConfig()
         self.logger = logging.getLogger(__name__)
+        self.payment_api = PaymentServiceAPI()
+        self.payment_status_map = {
+            "PENDING": "待支付", "SUCCESS": "支付成功", "FAILED": "支付失败",
+            "REFUNDED": "已退款", "REFUNDING": "退款中"
+        }
 
-        # 初始化 LLM
-        self.llm = ChatOpenAI(
+        llm = ChatOpenAI(
             api_key=self.config.SILICONFLOW_API_KEY,
             base_url=self.config.SILICONFLOW_BASE_URL,
             model=self.config.MODEL_NAME,
@@ -371,59 +375,46 @@ class PaymentAgent:
             timeout=30
         )
 
-        # 初始化支付服务 API
-        self.payment_api = PaymentServiceAPI()
+        tools = self._get_payment_tools()
 
-        # 支付状态映射
-        self.payment_status_map = {
-            "PENDING": "待支付",
-            "SUCCESS": "支付成功",
-            "FAILED": "支付失败",
-            "REFUNDED": "已退款",
-            "REFUNDING": "退款中"
-        }
-
-        # 初始化工具
-        self.tools = self._get_payment_tools()
-
-        # 创建 prompt 模板
-        self.prompt = ChatPromptTemplate.from_messages([
+        # 【不省略】: 提供完整的 Prompt
+        prompt = ChatPromptTemplate.from_messages([
             ("system", """你是专业的支付助手，负责处理支付相关的所有业务。你的能力包括：
 
-1. 💳 创建支付订单（自动成功）
-2. 📊 查询支付状态（支持支付ID或订单ID）
-3. 💰 处理退款申请
-4. 📋 获取用户支付记录
-5. 📦 获取订单支付记录
+    1. 💳 创建支付订单（自动成功）
+    2. 📊 查询支付状态（支持支付ID或订单ID）
+    3. 💰 处理退款申请
+    4. 📋 获取用户支付记录
+    5. 📦 获取订单支付记录
 
-工作特点：
-- 所有支付都是模拟的，使用CNY货币
-- 支付创建后会自动变为成功状态
-- 支持通过订单ID或支付ID查询状态
-- 退款原因可以为空，会使用默认原因
+    工作特点：
+    - 所有支付都是模拟的，使用CNY货币
+    - 支付创建后会自动变为成功状态
+    - 支持通过订单ID或支付ID查询状态
+    - 退款原因可以为空，会使用默认原因
 
-工作流程：
-1. 仔细理解用户的支付需求
-2. 根据需求选择合适的工具
-3. 使用JSON格式传递参数给工具
-4. 如果信息不足，友好地询问用户补充
-5. 提供清晰、专业的回复
+    工作流程：
+    1. 仔细理解用户的支付需求，并结合完整的对话历史来理解上下文。
+    2. 根据需求选择合适的工具。
+    3. 使用JSON格式传递参数给工具。
+    4. 如果信息不足，友好地询问用户补充。
+    5. 提供清晰、专业的回复。
 
-注意事项：
-- 支付金额最大限制：{max_amount} CNY
-- 只支持模拟支付方式
-- 创建支付时需要：订单ID（order_id）、用户ID（user_id）、金额（amount）
-- 查询支付时可以使用：支付ID（id）或 订单ID（order_id）
-- 退款时需要：支付ID（id），退款原因可选（reason）
+    注意事项：
+    - 支付金额最大限制：{max_amount} CNY
+    - 只支持模拟支付方式
+    - 创建支付时需要：订单ID（order_id）、用户ID（user_id）、金额（amount）
+    - 查询支付时可以使用：支付ID（id）或 订单ID（order_id）
+    - 退款时需要：支付ID（id），退款原因可选（reason）
 
-数据字段说明：
-- 支付ID字段名：id
-- 订单ID字段名：orderId
-- 用户ID字段名：userId
-- 创建时间字段名：createAt
-- 更新时间字段名：updateAt
+    数据字段说明：
+    - 支付ID字段名：id
+    - 订单ID字段名：orderId
+    - 用户ID字段名：userId
+    - 创建时间字段名：createAt
+    - 更新时间字段名：updateAt
 
-请始终保持专业、友好的服务态度。""".format(
+    请始终保持专业、友好的服务态度。""".format(
                 max_amount=self.config.MAX_PAYMENT_AMOUNT
             )),
             MessagesPlaceholder(variable_name="chat_history"),
@@ -431,14 +422,16 @@ class PaymentAgent:
             MessagesPlaceholder(variable_name="agent_scratchpad"),
         ])
 
-        # 创建 agent
-        self.agent = create_tool_calling_agent(
-            llm=self.llm,
-            tools=self.tools,
-            prompt=self.prompt
-        )
+        agent = create_tool_calling_agent(llm=llm, tools=tools, prompt=prompt)
 
-        print("PaymentAgent initialized.")
+        # 【修改】: 创建不带 memory 的 AgentExecutor
+        self._agent_executor = AgentExecutor(
+            agent=agent,
+            tools=tools,
+            verbose=True,
+            handle_parsing_errors=True
+        )
+        print("PaymentAgent initialized with a stateless executor.")
 
     def _get_payment_tools(self):
         """获取支付工具列表"""
@@ -450,45 +443,48 @@ class PaymentAgent:
             get_order_payments_tool(self)  # 新增：获取订单支付记录
         ]
 
-    async def _get_agent_executor(self, session_id: str) -> AgentExecutor:
-        """获取或创建 AgentExecutor 实例"""
-        message_history = RedisChatMessageHistory(
-            session_id=f"payment_{session_id}",
-            url=Config.REDIS_URL
-        )
-        
-        memory = ConversationBufferWindowMemory(
-            chat_memory=message_history,
-            memory_key="chat_history",
-            return_messages=True,
-            k=10
-        )
-        
-        return AgentExecutor(
-            agent=self.agent,
-            tools=self.tools,
-            verbose=True,
-            memory=memory,
-            handle_parsing_errors=True
-        )
+    # async def _get_agent_executor(self, session_id: str) -> AgentExecutor:
+    #     """获取或创建 AgentExecutor 实例"""
+    #     message_history = RedisChatMessageHistory(
+    #         session_id=f"payment_{session_id}",
+    #         url=Config.REDIS_URL
+    #     )
+    #
+    #     memory = ConversationBufferWindowMemory(
+    #         chat_memory=message_history,
+    #         memory_key="chat_history",
+    #         return_messages=True,
+    #         k=10
+    #     )
+    #
+    #     return AgentExecutor(
+    #         agent=self.agent,
+    #         tools=self.tools,
+    #         verbose=True,
+    #         memory=memory,
+    #         handle_parsing_errors=True
+    #     )
 
-    async def process_message(self, user_input: str, session_id: str) -> str:
+    # async def process_message(self, user_input: str, session_id: str) -> str:
+    # 【修改】: 重写核心方法，让 process_message 接收并使用 chat_history
+    async def process_message(self, user_input: str, session_id: str, chat_history: List[BaseMessage]) -> str:
         """
-        处理用户消息并返回 Agent 的响应
+        处理用户消息，使用传入的全局 chat_history 作为记忆。
         """
         self.logger.info(f"PaymentAgent 收到消息: {user_input} (Session: {session_id})")
-        
+        self.logger.info(f"--- 接收到的全局历史记录条数: {len(chat_history)} ---")
+
         try:
-            agent_executor = await self._get_agent_executor(session_id)
-            
-            # 调用 AgentExecutor
-            response = await agent_executor.ainvoke({"input": user_input})
-            
+            # 在 ainvoke 中明确传入 chat_history
+            response = await self._agent_executor.ainvoke({
+                "input": user_input,
+                "chat_history": chat_history
+            })
+
             output = response.get("output", "PaymentAgent: 抱歉，我无法处理您的请求。")
             self.logger.info(f"PaymentAgent 响应: {output}")
-            
-            return output
-            
+            return str(output)
+
         except Exception as e:
             self.logger.error(f"PaymentAgent 处理消息失败: {str(e)}")
             return f"PaymentAgent: 抱歉，处理您的请求时发生错误：{str(e)}"

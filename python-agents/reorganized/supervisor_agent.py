@@ -1,22 +1,20 @@
-# supervisor_agent.py
-
 import logging
 import asyncio
 import orjson
-from typing import Dict, Any, List, Optional, AsyncIterator
+from typing import Dict, Any, List, Optional, AsyncIterator, Literal
 from datetime import datetime, timezone
 
 import redis
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
-from langchain.agents import AgentExecutor, create_tool_calling_agent
-from langchain_core.tools import StructuredTool
+from pydantic import BaseModel, Field
+
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.base import BaseCheckpointSaver, Checkpoint, CheckpointTuple
 
 from config import Config
-from models import AgentState, ChatRequest
+from models import AgentState
 from agents.guide_agent import get_guide_agent, GuideAgent
 from agents.order_agent import get_order_agent, OrderAgent
 from agents.payment_agent import get_payment_agent, PaymentAgent
@@ -24,13 +22,8 @@ from agents.payment_agent import get_payment_agent, PaymentAgent
 logger = logging.getLogger(__name__)
 
 
-# --- 自定义 Redis Checkpointer 实现 (最终正确版) ---
+# --- 自定义 Redis Checkpointer 实现 (已修改) ---
 class RedisCheckpointer(BaseCheckpointSaver):
-    """
-    一个将检查点保存到 Redis 的 LangGraph Checkpointer。
-    【最终正确版】: 解决了 BaseMessage 对象的 JSON 序列化问题。
-    """
-
     def __init__(self):
         super().__init__()
         try:
@@ -48,19 +41,13 @@ class RedisCheckpointer(BaseCheckpointSaver):
         return f"langgraph:checkpoint:{thread_id}"
 
     def _serialize_checkpoint(self, checkpoint: Checkpoint) -> bytes:
-        """
-        【核心修正】: 为 orjson.dumps 提供一个 default 函数来处理 BaseMessage 对象。
-        """
-
-        def default_serializer(obj):
-            # 如果对象是 BaseMessage 的实例，将其转换为字典
-            if isinstance(obj, BaseMessage):
-                return obj.dict()
-            # 对于其他无法序列化的类型，抛出错误
-            raise TypeError(f"Type is not JSON serializable: {type(obj).__name__}")
-
-        # 使用 orjson.dumps 并传入自定义的 default 函数
-        return orjson.dumps(checkpoint, default=default_serializer)
+        # 使用 .dict() 方法进行序列化，以兼容 Pydantic V1/V2
+        serializable_checkpoint = checkpoint.copy()
+        if 'channel_values' in serializable_checkpoint and 'chat_history' in serializable_checkpoint['channel_values']:
+            serializable_checkpoint['channel_values']['chat_history'] = [
+                msg.dict() for msg in serializable_checkpoint['channel_values']['chat_history']
+            ]
+        return orjson.dumps(serializable_checkpoint)
 
     async def aget_tuple(self, config: Dict[str, Any]) -> Optional[CheckpointTuple]:
         thread_id = config["configurable"]["thread_id"]
@@ -68,11 +55,27 @@ class RedisCheckpointer(BaseCheckpointSaver):
         try:
             data = await asyncio.to_thread(self.redis.get, key)
             if data:
-                # LangGraph 的默认反序列化器可以处理从 .dict() 转换回来的对象
-                checkpoint = self.serializer.loads(data)
-                return CheckpointTuple(config=config, checkpoint=checkpoint)
+                checkpoint_dict = orjson.loads(data)
+                if 'channel_values' in checkpoint_dict and 'chat_history' in checkpoint_dict['channel_values']:
+                    history_dicts = checkpoint_dict['channel_values']['chat_history']
+                    rehydrated_history = []
+                    for msg_dict in history_dicts:
+                        if msg_dict.get('type') == 'ai':
+                            rehydrated_history.append(AIMessage(**msg_dict))
+                        elif msg_dict.get('type') == 'human':
+                            rehydrated_history.append(HumanMessage(**msg_dict))
+                    checkpoint_dict['channel_values']['chat_history'] = rehydrated_history
+
+                # 【修正 1】为 CheckpointTuple 提供所有必需的参数
+                return CheckpointTuple(
+                    config=config,
+                    checkpoint=checkpoint_dict,
+                    metadata=checkpoint_dict.get('metadata', {}),
+                    parent_config=checkpoint_dict.get('parent_config')
+                )
             return None
-        except Exception:
+        except Exception as e:
+            logger.error(f"从 Redis aget_tuple 失败: {e}")
             await asyncio.to_thread(self.redis.delete, key)
             return None
 
@@ -90,278 +93,169 @@ class RedisCheckpointer(BaseCheckpointSaver):
             config: Dict[str, Any],
             checkpoint: Checkpoint,
             metadata: Optional[Dict[str, Any]] = None,
-            new_writes: Optional[List[tuple[str, Any]]] = None
     ) -> Dict[str, Any]:
         thread_id = config["configurable"]["thread_id"]
         key = self._get_key(thread_id)
-        # 使用我们修正后的序列化方法
+        # 在保存前确保 metadata 存在
+        if metadata:
+            checkpoint['metadata'] = metadata
         serialized_checkpoint = self._serialize_checkpoint(checkpoint)
         await asyncio.to_thread(
             self.redis.set, key, serialized_checkpoint, ex=3600
         )
         return {"configurable": {"thread_id": thread_id}}
 
-    async def aput_writes(
-            self, config: Dict[str, Any], writes: List[tuple[str, Any]], task_id: str
-    ) -> Dict[str, Any]:
-        current_checkpoint_tuple = await self.aget_tuple(config)
-        if current_checkpoint_tuple:
-            checkpoint = current_checkpoint_tuple.checkpoint
-        else:
-            checkpoint = Checkpoint(v=1, ts=datetime.now(timezone.utc).isoformat(), channel_values={},
-                                    channel_versions={}, seen={})
 
-        for channel, value in writes:
-            checkpoint["channel_values"][channel] = value
-            checkpoint["channel_versions"][channel] = checkpoint["channel_versions"].get(channel, 0) + 1
-
-        return await self.aput(config, checkpoint)
+# --- 监管者路由决策层 ---
+class Router(BaseModel):
+    """根据用户请求，决定路由到哪个子代理或直接回复。"""
+    next: Literal["guide", "order", "payment", "__end__"] = Field(
+        description="要路由到的子代理名称，或者如果应该直接回复，则为 '__end__'。"
+    )
 
 
-# --- 1. 定义监管者 Agent 的工具 ---
-class SupervisorTools:
-    def __init__(self, guide_agent: GuideAgent, order_agent: OrderAgent, payment_agent: PaymentAgent):
-        self.guide_agent = guide_agent
-        self.order_agent = order_agent
-        self.payment_agent = payment_agent
+async def supervisor_router(state: AgentState) -> Dict[str, Any]:
+    """
+    这个函数是一个无状态的路由决策节点。
+    """
+    logger.info("---进入 Supervisor 路由决策---")
+    user_input = state["user_input"]
+    chat_history = state.get("chat_history", [])
 
-    def get_tools(self):
-        return [
-            StructuredTool.from_function(
-                name="guide_agent_process_message",
-                func=self.guide_agent.process_message,
-                args_schema=ChatRequest,
-                description="""当用户需要商品推荐、商品信息查询、产品对比等购物辅助信息时使用。
-                                输入参数: 一个包含 'user_input' (str) 和 'session_id' (str) 的 JSON 对象。
-                                返回商品推荐报告或相关购物信息。"""
-            ),
-            StructuredTool.from_function(
-                name="order_agent_process_message",
-                func=self.order_agent.process_message,
-                args_schema=ChatRequest,
-                description="""当用户需要查询订单状态、物流信息、创建订单、修改订单、取消订单、申请退款等订单相关操作时使用。
-                                输入参数: 一个包含 'user_input' (str) 和 'session_id' (str) 的 JSON 对象。
-                                返回订单处理结果或相关订单信息。"""
-            ),
-            StructuredTool.from_function(
-                name="payment_agent_process_message",
-                func=self.payment_agent.process_message,
-                args_schema=ChatRequest,
-                description="""当用户需要进行支付、查询支付状态、处理退款（支付层面）等支付相关操作时使用。
-                                输入参数: 一个包含 'user_input' (str) 和 'session_id' (str) 的 JSON 对象。
-                                返回支付处理结果或相关支付信息。"""
-            ),
-        ]
-
-
-# --- 2. 定义监管者 Agent ---
-class SupervisorAgent:
-    def __init__(self, guide_agent: GuideAgent, order_agent: OrderAgent, payment_agent: PaymentAgent):
-        self.llm = ChatOpenAI(
-            model=Config.LLM_MODEL_NAME,
-            temperature=Config.LLM_TEMPERATURE,
-            api_key=Config.SILICONFLOW_API_KEY,
-            base_url=Config.SILICONFLOW_API_BASE
-        )
-        self.supervisor_tools = SupervisorTools(guide_agent, order_agent, payment_agent).get_tools()
-
-        self.prompt = ChatPromptTemplate.from_messages([
-            ("system", """你是一个顶级智能客服调度中心。你的职责是根据用户的请求，精准地将其分发给专门的子代理。
-                        你拥有以下三个子代理工具：
-                        - `guide_agent_process_message`: 负责所有与商品浏览和推荐相关的任务。
-                        - `order_agent_process_message`: 负责所有与订单管理（创建、查询、修改、取消）相关的任务。
-                        - `payment_agent_process_message`: 负责所有与支付和退款相关的任务。
-
-                        你的决策逻辑：
-                        1.  分析用户输入的意图。
-                        2.  如果意图明确匹配某个子代理的职责，你必须调用对应的工具。
-                        3.  调用工具时，必须严格使用 `ChatRequest` 格式，包含 `user_input` 和 `session_id`。
-                        4.  如果用户只是打招呼或意图不明确，请不要调用任何工具，而是直接回复，引导用户说出具体需求。
-                        """),
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", """你是一个顶级智能客服调度中心。你的职责是根据用户的最新请求和完整的对话历史，精准地将其分发给专门的子代理。
+            - 如果请求与商品推荐、查询、对比相关，选择 'guide'。
+            - 如果请求与订单状态、创建、修改、取消相关，选择 'order'。
+            - 如果请求与支付、退款、付款状态相关，选择 'payment'。
+            - 如果用户只是打招呼、闲聊或意图不明确，选择 '__end__' 以直接回复。
+            当用户询问你的功能时，你应该对以上功能进行相应介绍。"""),
             MessagesPlaceholder(variable_name="chat_history"),
-            ("human", "{input}"),
-            MessagesPlaceholder(variable_name="agent_scratchpad"),
-        ])
+            ("user", "{input}"),
+        ]
+    )
+    llm = ChatOpenAI(
+        model=Config.LLM_MODEL_NAME,
+        temperature=0,
+        api_key=Config.SILICONFLOW_API_KEY,
+        base_url=Config.SILICONFLOW_API_BASE
+    )
+    structured_llm = llm.with_structured_output(Router)
 
-        agent = create_tool_calling_agent(
-            llm=self.llm,
-            tools=self.supervisor_tools,
-            prompt=self.prompt
-        )
-        self.agent_executor_instance = AgentExecutor(
-            agent=agent,
-            tools=self.supervisor_tools,
-            verbose=True,
-            handle_parsing_errors=True
-        )
-        logger.info("SupervisorAgent initialized.")
+    try:
+        prompt_value = await prompt.ainvoke({"input": user_input, "chat_history": chat_history})
+        route_decision = await structured_llm.ainvoke(prompt_value)
+        logger.info(f"Supervisor 路由决策结果: {route_decision.next}")
 
-    async def route_user_request(self, state: AgentState) -> Dict[str, Any]:
-        user_input = state["user_input"]
-        session_id = state["session_id"]
-        chat_history = state.get("chat_history", [])
+        updated_history = chat_history + [HumanMessage(content=user_input)]
 
-        try:
-            response = await self.agent_executor_instance.ainvoke({
-                "input": user_input,
-                "chat_history": chat_history
-            })
+        if route_decision.next == "__end__":
+            response_prompt = ChatPromptTemplate.from_messages([
+                ("system", "你是一个友好的人工智能助手。"),
+                MessagesPlaceholder(variable_name="chat_history"),
+                ("user", "{input}")
+            ])
+            response_chain = response_prompt | llm
+            response = await response_chain.ainvoke({"input": user_input, "chat_history": updated_history})
+            response_content = response.content if hasattr(response,
+                                                           'content') and response.content.strip() else "您好！很高兴为您服务。"
 
-            if "tool_calls" in response and response["tool_calls"]:
-                tool_call = response["tool_calls"][0]
-                tool_name = tool_call["name"]
-                logger.info(f"SupervisorAgent 决定路由到: {tool_name}")
-
-                state["next_agent"] = tool_name
-                state["chat_history"].append(HumanMessage(content=user_input))
-                state["chat_history"].append(
-                    AIMessage(content=f"好的，正在为您转接至{tool_name.replace('_process_message', '')}..."))
-            else:
-                output = response.get("output", "抱歉，我暂时无法理解您的意思，可以换个方式提问吗？")
-                logger.info(f"SupervisorAgent 直接回答: {output}")
-                state["agent_response"] = output
-                state["next_agent"] = "FINISH"
-                state["chat_history"].append(HumanMessage(content=user_input))
-                state["chat_history"].append(AIMessage(content=output))
-
-        except Exception as e:
-            logger.exception(f"监管者 Agent 路由失败: {e}")
-            error_message = f"抱歉，系统调度时发生错误，请稍后再试。错误详情: {e}"
-            state["agent_response"] = error_message
-            state["next_agent"] = "FINISH"
-            state["chat_history"].append(HumanMessage(content=user_input))
-            state["chat_history"].append(AIMessage(content=error_message))
-
-        return state
+            return {
+                "agent_response": response_content,
+                "chat_history": updated_history + [AIMessage(content=response_content)],
+                "next_agent": "__end__"
+            }
+        else:
+            return {
+                "chat_history": updated_history,
+                "next_agent": route_decision.next
+            }
+    except Exception as e:
+        logger.error(f"Supervisor 路由决策失败: {e}")
+        return {"agent_response": f"抱歉，系统在分配任务时发生错误: {e}", "next_agent": "__end__"}
 
 
-# --- 3. LangGraph 工作流定义 ---
+# --- LangGraph 工作流定义 ---
 class MultiAgentWorkflow:
     def __init__(self):
         self.guide_agent: Optional[GuideAgent] = None
         self.order_agent: Optional[OrderAgent] = None
         self.payment_agent: Optional[PaymentAgent] = None
-        self.supervisor_agent: Optional[SupervisorAgent] = None
-        self.workflow: Optional[StateGraph] = None
+        self.checkpointer = RedisCheckpointer()
+        self.is_initialized = False
 
-    async def initialize_agents(self):
-        if not self.guide_agent:
-            self.guide_agent = await get_guide_agent()
-        if not self.order_agent:
-            self.order_agent = await get_order_agent()
-        if not self.payment_agent:
-            self.payment_agent = await get_payment_agent()
-        if not self.supervisor_agent:
-            self.supervisor_agent = SupervisorAgent(self.guide_agent, self.order_agent, self.payment_agent)
+    async def initialize(self):
+        """初始化所有 Agent 和工作流组件。"""
+        if self.is_initialized:
+            return
+        if not self.guide_agent: self.guide_agent = await get_guide_agent()
+        if not self.order_agent: self.order_agent = await get_order_agent()
+        if not self.payment_agent: self.payment_agent = await get_payment_agent()
         logger.info("所有 Agent 初始化完成。")
-
-    def build_workflow(self):
-        workflow = StateGraph(AgentState)
-
-        workflow.add_node("supervisor", self.supervisor_agent.route_user_request)
-        workflow.add_node("guide_agent_node",
-                          self._create_agent_node("guide_agent_output", self.guide_agent.process_message))
-        workflow.add_node("order_agent_node",
-                          self._create_agent_node("order_agent_output", self.order_agent.process_message))
-        workflow.add_node("payment_agent_node",
-                          self._create_agent_node("payment_agent_output", self.payment_agent.process_message))
-
-        workflow.set_entry_point("supervisor")
-
-        def route_to_agent(state: AgentState):
-            next_agent = state.get("next_agent")
-            if next_agent == "guide_agent_process_message":
-                return "guide_agent_node"
-            if next_agent == "order_agent_process_message":
-                return "order_agent_node"
-            if next_agent == "payment_agent_process_message":
-                return "payment_agent_node"
-            return END
-
-        workflow.add_conditional_edges(
-            "supervisor",
-            route_to_agent,
-            {
-                "guide_agent_node": "guide_agent_node",
-                "order_agent_node": "order_agent_node",
-                "payment_agent_node": "payment_agent_node",
-                END: END
-            }
-        )
-
-        workflow.add_edge("guide_agent_node", END)
-        workflow.add_edge("order_agent_node", END)
-        workflow.add_edge("payment_agent_node", END)
-
-        self.workflow = workflow.compile(
-            checkpointer=RedisCheckpointer()
-        )
-        logger.info("LangGraph 工作流构建并编译完成。")
+        self.is_initialized = True
 
     async def invoke_workflow(self, user_input: str, session_id: str) -> str:
-        if not self.workflow:
-            await self.initialize_agents()
-            self.build_workflow()
+        """
+        重写整个调用流程，手动管理状态传递，不再使用 graph.ainvoke。
+        """
+        await self.initialize()
 
         thread_config = {"configurable": {"thread_id": session_id}}
 
-        initial_state = AgentState(
-            user_input=user_input,
-            session_id=session_id,
-            chat_history=[],
-            agent_response=None,
-            next_agent=None,
-            guide_agent_output=None,
-            order_agent_output=None,
-            payment_agent_output=None,
+        # 1. 从 Redis 加载历史检查点
+        checkpoint_tuple = await self.checkpointer.aget_tuple(thread_config)
+
+        # 2. 正确提取历史消息
+        chat_history = []
+        if checkpoint_tuple and checkpoint_tuple.checkpoint and "channel_values" in checkpoint_tuple.checkpoint and "chat_history" in \
+                checkpoint_tuple.checkpoint["channel_values"]:
+            chat_history = checkpoint_tuple.checkpoint["channel_values"]["chat_history"]
+
+        # 3. 调用 supervisor 节点
+        supervisor_input_state = AgentState(user_input=user_input, session_id=session_id, chat_history=chat_history)
+        supervisor_output = await supervisor_router(supervisor_input_state)
+
+        next_agent_name = supervisor_output.get("next_agent")
+        updated_history = supervisor_output.get("chat_history", [])
+        final_response = ""
+        final_history_to_save = updated_history
+
+        # 4. 根据 supervisor 决策调用下一个节点
+        if next_agent_name == "__end__":
+            final_response = supervisor_output.get("agent_response", "系统未能生成回复。")
+            final_history_to_save = supervisor_output.get("chat_history", [])
+
+        elif next_agent_name in ["guide", "order", "payment"]:
+            agent_map = {"guide": self.guide_agent, "order": self.order_agent, "payment": self.payment_agent}
+            target_agent = agent_map[next_agent_name]
+
+            agent_result = await target_agent.process_message(
+                user_input=user_input, session_id=session_id, chat_history=updated_history
+            )
+
+            final_response = agent_result
+            final_history_to_save = updated_history + [AIMessage(content=agent_result)]
+
+        else:
+            final_response = "抱歉，系统路由出现未知错误。"
+            final_history_to_save = updated_history + [AIMessage(content=final_response)]
+
+        # 5. 手动将最终的、完整的状态保存回 Redis
+        final_checkpoint = Checkpoint(
+            v=1,
+            ts=datetime.now(timezone.utc).isoformat(),
+            channel_values={"chat_history": final_history_to_save},
+            channel_versions={},
+            seen={},
+            metadata={},
+            parent_config=None
         )
+        await self.checkpointer.aput(thread_config, final_checkpoint)
 
-        try:
-            final_state = None
-            async for event in self.workflow.astream(initial_state, config=thread_config):
-                if "supervisor" in event or "guide_agent_node" in event or "order_agent_node" in event or "payment_agent_node" in event:
-                    final_state = event
+        logger.info(f"最终状态内容: {final_checkpoint['channel_values']}")
+        logger.info(f"从 {next_agent_name or 'supervisor'} 获取响应: {final_response}")
 
-            if not final_state:
-                raise ValueError("工作流未能返回最终状态。")
-
-            last_node_name = list(final_state.keys())[-1]
-            final_agent_state = final_state[last_node_name]
-
-            if final_agent_state.get("agent_response"):
-                return final_agent_state["agent_response"]
-            if final_agent_state.get("guide_agent_output"):
-                return final_agent_state["guide_agent_output"]
-            if final_agent_state.get("order_agent_output"):
-                return final_agent_state["order_agent_output"]
-            if final_agent_state.get("payment_agent_output"):
-                return final_agent_state["payment_agent_output"]
-
-            return "抱歉，系统未能处理您的请求，请稍后再试。"
-
-        except Exception as e:
-            logger.exception(f"LangGraph 工作流执行失败: {e}")
-            return f"抱歉，系统在处理您的请求时发生严重错误: {e}"
-
-    def _create_agent_node(self, output_key: str, agent_method):
-        async def agent_node(state: AgentState) -> Dict[str, Any]:
-            user_input = state["user_input"]
-            session_id = state["session_id"]
-            logger.info(f"调用子 Agent: {agent_method.__self__.__class__.__name__} for session {session_id}")
-
-            try:
-                result = await agent_method(user_input=user_input, session_id=session_id)
-                state[output_key] = result
-                state["chat_history"].append(AIMessage(content=result))
-            except Exception as e:
-                logger.exception(f"子 Agent 调用失败 ({agent_method.__name__}): {e}")
-                error_message = f"抱歉，{agent_method.__self__.__class__.__name__} 在处理时遇到问题: {e}"
-                state["agent_response"] = error_message
-                state["chat_history"].append(AIMessage(content=error_message))
-
-            return state
-
-        return agent_node
+        return final_response
 
 
 # --- 全局工作流实例管理 ---
@@ -370,10 +264,12 @@ _workflow_lock = asyncio.Lock()
 
 
 async def get_multi_agent_workflow() -> MultiAgentWorkflow:
+    """获取并按需初始化全局工作流实例。"""
     global multi_agent_workflow_instance
-    async with _workflow_lock:
-        if multi_agent_workflow_instance is None:
-            multi_agent_workflow_instance = MultiAgentWorkflow()
-            await multi_agent_workflow_instance.initialize_agents()
-            multi_agent_workflow_instance.build_workflow()
+    if multi_agent_workflow_instance is None:
+        async with _workflow_lock:
+            if multi_agent_workflow_instance is None:
+                multi_agent_workflow_instance = MultiAgentWorkflow()
+
+    await multi_agent_workflow_instance.initialize()
     return multi_agent_workflow_instance
