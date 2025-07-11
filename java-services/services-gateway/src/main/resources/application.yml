@@ -27,7 +27,7 @@ spring:
               filters:
                 - StripPrefix=1
             - id: agents-service
-              uri: http://localhost:8085
+              uri: http://10.172.145.109:8085
               predicates:
                 - Path=/agents/**
               filters:
