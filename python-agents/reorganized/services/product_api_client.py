@@ -18,6 +18,7 @@ class ProductAPIClient:
         """通用请求方法"""
         full_url = urljoin(self.base_url, endpoint)
         print(f"--- Calling Product API: {method.upper()} {full_url} with params: {params} ---")
+        print(f"Actual request URL: {self.client.build_request(method, full_url, params=params).url}")
         try:
             response = await self.client.request(method, full_url, params=params, timeout=10)
             response.raise_for_status()  # 检查HTTP错误状态码
@@ -47,13 +48,13 @@ class ProductAPIClient:
             raise ValueError(f"商品API未知错误: {e}")
 
     async def search_by_name(self, name: str) -> List[Product]:
-        return await self._request("GET", "/search", {"name": name})
+        return await self._request("GET", "/product/api/products/search", {"name": name})
 
     async def search_by_category(self, category: str) -> List[Product]:
-        return await self._request("GET", f"/category/{category}")
+        return await self._request("GET", f"/product/api/products/category/{category}")
 
     async def search_by_brand(self, brand: str) -> List[Product]:
-        return await self._request("GET", f"/brand/{brand}")
+        return await self._request("GET", f"/product/api/products/brand/{brand}")
 
     async def search_by_price_range(self, min_price: Optional[float] = None, max_price: Optional[float] = None) -> List[
         Product]:
@@ -62,13 +63,13 @@ class ProductAPIClient:
             params["minPrice"] = min_price
         if max_price is not None:
             params["maxPrice"] = max_price
-        return await self._request("GET", "/price-range", params)
+        return await self._request("GET", "/product/api/products/price-range", params)
 
     async def search_by_tag(self, tag: str) -> List[Product]:
-        return await self._request("GET", f"/tag/{tag}")
+        return await self._request("GET", f"/product/api/products/tag/{tag}")
 
     async def search_available_products(self) -> List[Product]:
-        return await self._request("GET", "/available")
+        return await self._request("GET", "/product/api/products/available")
 
     async def close(self):
         """关闭 httpx 客户端会话"""

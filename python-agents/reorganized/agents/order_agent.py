@@ -1,6 +1,7 @@
 import os
 import sys
 from typing import Dict, Any, Optional, List
+import requests
 
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, BaseMessage
@@ -14,97 +15,97 @@ sys.path.append(project_root)
 
 from config import Config
 
-# 模拟订单数据库和工具函数 (这部分保持不变)
-orders = {}
-
+# 假设的 API 基础 URL
+API_BASE_URL = "http://10.172.66.224:8084"
 
 def create_order(input: str) -> str:
-    # ... (省略内部实现)
     try:
         product_name, quantity, address, payment_method = input.split(',', 3)
         quantity = int(quantity.strip())
     except ValueError:
         return "参数格式错误，请使用：商品名称,数量，收货地址，支付方式"
 
-    order_id = f"ORD-{hash(product_name + address) % 1000000:06d}"
-    orders[order_id] = {
+    data = {
         "product_name": product_name.strip(),
         "quantity": quantity,
         "address": address.strip(),
-        "payment_method": payment_method.strip(),
-        "status": "未支付"
+        "payment_method": payment_method.strip()
     }
-    return (f"已成功创建订单 {order_id}，当前状态：未支付\n"
-            f"- 商品: {product_name.strip()} x {quantity}\n"
-            f"- 收货地址: {address.strip()}\n"
-            f"- 支付方式: {payment_method.strip()}\n\n"
-            "你可以使用订单ID查询订单状态或物流信息。")
-
+    response = requests.post(f"{API_BASE_URL}/orders", json=data)
+    if response.status_code == 201:
+        order = response.json()
+        return (f"已成功创建订单 {order['order_id']}，当前状态：{order['status']}\n"
+                f"- 商品: {order['product_name']} x {order['quantity']}\n"
+                f"- 收货地址: {order['address']}\n"
+                f"- 支付方式: {order['payment_method']}\n\n"
+                "你可以使用订单ID查询订单状态或物流信息。")
+    else:
+        return f"创建订单失败: {response.text}"
 
 def modify_order(input: str) -> str:
-    # ... (省略内部实现)
     try:
         order_id, modification = input.split(',', 1)
-        if order_id not in orders:
-            return f"订单 {order_id} 不存在。"
         key, value = modification.strip().split('=')
-        if key in orders[order_id]:
-            orders[order_id][key] = value
+        data = {key: value}
+        response = requests.patch(f"{API_BASE_URL}/orders/{order_id}", json=data)
+        if response.status_code == 200:
             return f"订单 {order_id} 的{key}已修改为 {value}。"
+        elif response.status_code == 404:
+            return f"订单 {order_id} 不存在。"
         else:
-            return f"订单 {order_id} 没有 {key} 这个字段。"
+            return f"修改订单失败: {response.text}"
     except ValueError:
         return "参数格式错误，请使用：订单ID,修改内容"
 
-
 def query_order_status(order_id: str) -> str:
-    # ... (省略内部实现)
-    if order_id not in orders:
+    response = requests.get(f"{API_BASE_URL}/orders/{order_id}/status")
+    if response.status_code == 200:
+        status = response.json()["status"]
+        return f"订单 {order_id} 当前状态：{status}"
+    elif response.status_code == 404:
         return f"订单 {order_id} 不存在。"
-    status = orders[order_id]["status"]
-    return f"订单 {order_id} 当前状态：{status}"
-
+    else:
+        return f"查询订单状态失败: {response.text}"
 
 def logistics_query(order_id: str) -> str:
-    # ... (省略内部实现)
-    status = query_order_status(order_id).split("：")[-1]
+    status_response = requests.get(f"{API_BASE_URL}/orders/{order_id}/status")
+    if status_response.status_code == 404:
+        return f"订单 {order_id} 不存在。"
+    status = status_response.json()["status"]
     if status == "未支付":
         return f"订单 {order_id} 当前状态为 {status}，暂不提供物流信息。"
-    logistics_info = {
-        "已发货": f"订单 {order_id} 的物流信息：快递单号 KDS982734，正在运输中，预计明天送达。",
-        "已签收": f"订单 {order_id} 已于 2025年7月1日 15:30 签收，签收人：李小明。",
-    }
-    return logistics_info.get(status, f"订单 {order_id} 当前状态为 {status}，暂无物流信息。")
-
+    response = requests.get(f"{API_BASE_URL}/orders/{order_id}/logistics")
+    if response.status_code == 200:
+        logistics_info = response.json()
+        return f"订单 {order_id} 的物流信息：{logistics_info}"
+    else:
+        return f"查询物流信息失败: {response.text}"
 
 def refund_order(order_id: str) -> str:
-    # ... (省略内部实现)
-    if order_id not in orders:
+    response = requests.post(f"{API_BASE_URL}/orders/{order_id}/refund")
+    if response.status_code == 200:
+        return f"订单 {order_id} 已成功取消，退款将在3-5个工作日内退回原支付账户。"
+    elif response.status_code == 404:
         return f"订单 {order_id} 不存在。"
-    status = orders[order_id]["status"]
-    if status in ["已取消", "已签收"]:
+    elif response.status_code == 400:
+        status = response.json()["status"]
         return f"订单 {order_id} 当前状态为 {status}，无法办理退款。"
-    if status == "未支付":
-        orders[order_id]["status"] = "已取消"
-        return f"订单 {order_id} 已成功取消。"
-    # 这里可以添加实际的退款逻辑
-    orders[order_id]["status"] = "已取消"
-    return f"订单 {order_id} 已成功取消，退款将在3-5个工作日内退回原支付账户。"
-
+    else:
+        return f"退款失败: {response.text}"
 
 def mark_order_as_paid(order_id: str) -> str:
-    # ... (省略内部实现)
-    if order_id not in orders:
-        return f"订单 {order_id} 不存在。"
-    if orders[order_id]["status"] == "未支付":
-        orders[order_id]["status"] = "已支付"
+    response = requests.post(f"{API_BASE_URL}/orders/{order_id}/pay")
+    if response.status_code == 200:
         return f"订单 {order_id} 已成功支付。"
+    elif response.status_code == 404:
+        return f"订单 {order_id} 不存在。"
+    elif response.status_code == 400:
+        status = response.json()["status"]
+        return f"订单 {order_id} 当前状态为 {status}，无需再次支付。"
     else:
-        return f"订单 {order_id} 当前状态为 {orders[order_id]['status']}，无需再次支付。"
-
+        return f"标记订单为已支付失败: {response.text}"
 
 def get_order_tools():
-    # ... (省略内部实现)
     return [
         Tool(name="CreateOrder", func=create_order, description="创建新订单，参数格式：商品名称,数量,收货地址,支付方式"),
         Tool(name="ModifyOrder", func=modify_order,
@@ -114,7 +115,6 @@ def get_order_tools():
         Tool(name="RefundOrder", func=refund_order, description="取消订单并退款，参数：订单ID"),
         Tool(name="MarkOrderAsPaid", func=mark_order_as_paid, description="标记订单为已支付，参数：订单ID")
     ]
-
 
 # ----------------------------------------------------------------------
 
@@ -171,10 +171,8 @@ class OrderAgent:
             print(f"ERROR: {error_msg}")
             return error_msg
 
-
 # 全局 OrderAgent 实例
 order_agent_instance: Optional['OrderAgent'] = None
-
 
 async def get_order_agent() -> 'OrderAgent':
     global order_agent_instance
