@@ -1,0 +1,37 @@
+# application-prod.yml
+spring:
+  application:
+    name: services-gateway
+
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: order-service
+              uri: http://order-service:8083
+              predicates:
+                - Path=/order/**
+              filters:
+                - StripPrefix=1
+
+            - id: product-service
+              uri: http://product-service:8082
+              predicates:
+                - Path=/product/**
+              filters:
+                - StripPrefix=1
+
+            - id: payment-service
+              uri: http://payment-service:8081
+              predicates:
+                - Path=/payment/**
+              filters:
+                - StripPrefix=1
+
+    nacos:
+      discovery:
+        server-addr: nacos:8848
+
+server:
+  port: 8084
