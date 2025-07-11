@@ -4,6 +4,7 @@ import org.randombo.productservice.model.Product;
 import org.randombo.productservice.repository.ProductRepository;
 import org.randombo.productservice.service.ProductService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -187,6 +188,11 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public Optional<Product> updatePrice(String id, BigDecimal newPrice) {
+        // 添加价格验证
+        if (newPrice.compareTo(BigDecimal.ZERO) < 0) {
+            return productRepository.findById(id);
+        }
+
         return productRepository.findById(id).map(product -> {
             product.setPrice(newPrice);
             product.setUpdateTime(LocalDateTime.now());
@@ -206,8 +212,13 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public boolean deleteProduct(String id) {
         if (productRepository.existsById(id)) {
-            productRepository.deleteById(id);
-            return true;
+            try {
+                productRepository.deleteById(id);
+                return true;
+            } catch (EmptyResultDataAccessException e) {
+                // 处理并发场景
+                return false;
+            }
         }
         return false;
     }
