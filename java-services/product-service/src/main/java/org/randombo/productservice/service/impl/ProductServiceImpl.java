@@ -210,14 +210,13 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-// ProductServiceImpl.java
     public boolean deleteProduct(String id) {
         if (productRepository.existsById(id)) {
             try {
                 productRepository.deleteById(id);
                 return true;
-            } catch (EmptyResultDataAccessException ex) {
-                // 处理并发删除场景
+            } catch (EmptyResultDataAccessException e) {
+                // 处理并发场景
                 return false;
             }
         }

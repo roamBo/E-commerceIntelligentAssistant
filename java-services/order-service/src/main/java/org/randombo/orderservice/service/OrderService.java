@@ -1,7 +1,7 @@
 package org.randombo.orderservice.service;
 
 import org.randombo.orderservice.model.Order;
-// import org.randombo.orderservice.model.OrderStatus; // XXXX 确保此导入已移除或注释掉
+// import org.randombo.orderservice.model.OrderStatus; // 确保此导入已移除或注释掉
 import org.randombo.orderservice.repository.OrderRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -30,18 +30,19 @@ public class OrderService {
     }
 
     // 3. 根据用户ID查询订单列表
-    public List<Order> findOrdersByUserId(Long userId) {
+    // 参数类型已从 Long 更改为 String
+    public List<Order> findOrdersByUserId(String userId) {
         return orderRepository.findByUserId(userId);
     }
 
     // 4. 创建订单
     public Order createOrder(Order newOrder) {
-        // XXXX 修正：如果传入的newOrder已经有orderId，则直接使用它 (为了测试重复订单号)
+        // 修正：如果传入的newOrder已经有orderId，则直接使用它 (为了测试重复订单号)
         if (newOrder.getOrderId() == null || newOrder.getOrderId().isEmpty()) {
             newOrder.setOrderId("ORDER-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase()); // 正常情况下自动生成
         }
 
-        // XXXX 新增：在保存前检查orderId的唯一性（程序层面检查）
+        // 新增：在保存前检查orderId的唯一性（程序层面检查）
         // 如果orderId已经存在，抛出异常，这将导致HTTP 400 Bad Request
         if (orderRepository.findByOrderId(newOrder.getOrderId()).isPresent()) {
             throw new IllegalArgumentException("Order ID " + newOrder.getOrderId() + " already exists. Please try again or use a different ID.");
@@ -73,6 +74,7 @@ public class OrderService {
     // 6. 通用订单更新方法
     public Optional<Order> updateOrder(String orderId, Order updatedOrderData) {
         return orderRepository.findByOrderId(orderId).map(existingOrder -> {
+            // userId 字段现在是 String 类型，这里保持不变，因为它是直接从 updatedOrderData 获取 String 类型的值
             if (updatedOrderData.getUserId() != null) {
                 existingOrder.setUserId(updatedOrderData.getUserId());
             }
@@ -83,7 +85,7 @@ public class OrderService {
                 existingOrder.setStatus(updatedOrderData.getStatus());
             }
 
-            // XXXX 修正：更安全地更新items集合 for @OneToMany with orphanRemoval=true
+            // 修正：更安全地更新items集合 for @OneToMany with orphanRemoval=true
             if (updatedOrderData.getItems() != null) {
                 // 创建一个Map，用于快速查找传入的订单项（以ID为键）
                 Map<Long, Order.OrderItem> incomingItemsMap = updatedOrderData.getItems().stream()

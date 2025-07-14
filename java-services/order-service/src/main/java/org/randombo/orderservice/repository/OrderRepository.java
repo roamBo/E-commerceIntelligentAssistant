@@ -13,7 +13,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     Optional<Order> findByOrderId(String orderId);
 
-    List<Order> findByUserId(Long userId);
+    // 参数类型已从 Long 更改为 String
+    List<Order> findByUserId(String userId);
 
 
     List<Order> findByStatusAndOrderTimeBefore(String status, LocalDateTime orderTime);

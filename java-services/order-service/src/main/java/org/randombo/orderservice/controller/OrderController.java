@@ -1,7 +1,6 @@
 package org.randombo.orderservice.controller;
 
 import org.randombo.orderservice.model.Order;
-// import org.randombo.orderservice.model.OrderStatus; // XXXX 移除此导入
 import org.randombo.orderservice.service.OrderService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -35,9 +34,9 @@ public class OrderController {
     }
 
     // 3. 根据用户ID查询订单：GET /api/orders/user/{userId}
-    // 这是订单查询功能的核心API之二
+    // 参数类型已从 Long 更改为 String
     @GetMapping("/user/{userId}")
-    public List<Order> getOrdersByUserId(@PathVariable Long userId) {
+    public List<Order> getOrdersByUserId(@PathVariable String userId) { // <-- 这一行被修改了！
         return orderService.findOrdersByUserId(userId);
     }
 
@@ -98,9 +97,9 @@ public class OrderController {
 
     // 10. 专门的订单状态转换 API
     @PutMapping("/{orderId}/status/{newStatus}")
-    public ResponseEntity<Order> updateOrderStatus(@PathVariable String orderId, @PathVariable String newStatus) { // XXXX 接收String
+    public ResponseEntity<Order> updateOrderStatus(@PathVariable String orderId, @PathVariable String newStatus) {
         // 直接将字符串传给Service层，Service层处理业务逻辑
-        return orderService.updateOrderStatus(orderId, newStatus) // XXXX 直接传入字符串
+        return orderService.updateOrderStatus(orderId, newStatus)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.badRequest().build());
     }
