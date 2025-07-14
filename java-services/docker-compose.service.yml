@@ -12,7 +12,7 @@ services:
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
       SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.MySQL8Dialect
       SPRING_DATASOURCE_USERNAME: "root"
-      SPRING_DATASOURCE_PASSWORD: "Longquan1"
+      SPRING_DATASOURCE_PASSWORD: "20040412mzq"
       SPRING_CLOUD_NACOS_DISCOVERY_SERVER-ADDR: "nacos-test:8848"
     networks:
       - backend

@@ -3,7 +3,7 @@ services:
     image: mysql:8
     container_name: mysql-test
     environment:
-      MYSQL_ROOT_PASSWORD: Longquan1
+      MYSQL_ROOT_PASSWORD: 20040412mzq
     ports:
       - "3306:3306"
     volumes:
@@ -27,7 +27,7 @@ services:
       - MYSQL_MASTER_HOST=mysql-test
       - MYSQL_MASTER_PORT=3306
       - MYSQL_MASTER_USER=root
-      - MYSQL_MASTER_PASSWORD=Longquan1
+      - MYSQL_MASTER_PASSWORD=20040412mzq
       - MYSQL_MASTER_DB_NAME=nacos_config
       - TZ=Asia/Shanghai
 
