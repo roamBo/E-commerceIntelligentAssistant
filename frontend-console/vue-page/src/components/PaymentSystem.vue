@@ -4,23 +4,53 @@
     <div class="payment-container">
       <div class="payment-header">
         <h2>支付信息</h2>
-        <div class="payment-status" :class="paymentStatus.class">
+        <div v-if="isLoading" class="payment-status status-loading">
+          加载中...
+        </div>
+        <div v-else-if="paymentStatus" class="payment-status" :class="paymentStatus.class">
           {{ paymentStatus.text }}
         </div>
       </div>
       
+      <!-- 加载中状态 -->
+      <div v-if="isLoading" class="loading-indicator">
+        <div class="loading-spinner">
+          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M12 6v6l4 2"></path>
+          </svg>
+        </div>
+        <div class="loading-text">正在获取支付信息...</div>
+      </div>
+      
       <!-- 支付结果信息卡片 -->
-      <div class="payment-result-card">
+      <div v-else-if="paymentStatus" class="payment-result-card">
         <div class="result-icon" :class="paymentStatus.id">
           <i v-if="paymentStatus.id === 'success'" class="success-icon">✓</i>
           <i v-else-if="paymentStatus.id === 'failed'" class="failed-icon">✕</i>
-          <i v-else class="pending-icon">⟳</i>
+          <i v-else class="pending-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+              <polyline points="21 3 21 9 15 9"></polyline>
+            </svg>
+          </i>
         </div>
         <div class="result-message">{{ paymentStatus.message }}</div>
       </div>
       
+      <!-- 加载中状态 -->
+      <div v-else class="loading-indicator">
+        <div class="loading-spinner">
+          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M12 6v6l4 2"></path>
+          </svg>
+        </div>
+        <div class="loading-text">正在获取支付信息...</div>
+      </div>
+      
       <!-- 订单和支付详情 -->
-      <div class="payment-details">
+      <div v-if="!isLoading && paymentStatus && paymentStatus.id !== 'failed'" class="payment-details">
         <!-- 左侧：订单信息 -->
         <div class="order-info">
           <h3>订单信息</h3>
@@ -60,7 +90,7 @@
       </div>
       
       <!-- 商品信息 -->
-      <div class="product-info">
+      <div v-if="!isLoading && paymentStatus && paymentStatus.id !== 'failed'" class="product-info">
         <h3>商品信息</h3>
         <div class="product-item">
           <div class="product-name">{{ paymentInfo.productName }}</div>
@@ -71,12 +101,12 @@
       
       <!-- 底部操作栏 -->
       <div class="action-bar">
-        <div class="total-amount">
+        <div v-if="!isLoading && paymentStatus && paymentStatus.id !== 'failed'" class="total-amount">
           <span>实付金额：</span>
           <span class="amount">¥{{ paymentInfo.amount.toFixed(2) }}</span>
         </div>
         <div class="buttons">
-          <button class="action-button" @click="viewOrderDetails">查看订单详情</button>
+          <button v-if="!isLoading && paymentStatus && paymentStatus.id !== 'failed'" class="action-button" @click="viewOrderDetails">查看订单详情</button>
           <button class="action-button primary" @click.prevent="goBack">返回首页</button>
         </div>
       </div>
@@ -134,9 +164,12 @@
 
 <script setup>
 import { ref, reactive, onMounted, onBeforeUnmount } from 'vue';
+import paymentService from '../services/paymentService';
 
 // 定义事件
 const emit = defineEmits(['change']);
+
+// 不需要props，直接使用模拟数据
 
 // 支付状态类型
 const statusTypes = {
@@ -160,58 +193,38 @@ const statusTypes = {
   }
 };
 
-// 当前支付状态（这里设为成功，实际应从API获取）
-const paymentStatus = ref(statusTypes.success);
+// 支付状态映射表
+const statusMapping = {
+  'SUCCESS': 'success',
+  'FAILED': 'failed',
+  'PENDING': 'pending',
+  'PROCESSING': 'pending',
+  'CANCELLED': 'failed',
+  'success': 'success',
+  'failed': 'failed',
+  'pending': 'pending'
+};
 
-// 支付信息（模拟数据，实际应从API获取）
+// 加载状态
+const isLoading = ref(true);
+
+// 当前支付状态（初始为null，避免显示闪烁的待处理状态）
+const paymentStatus = ref(null);
+
+// 支付信息（初始为空，稍后从API获取）
 const paymentInfo = reactive({
-  orderId: 'ORD98765432',
-  orderTime: '2023-06-15 14:30:22',
-  amount: 2499.00,
-  method: 'alipay',
-  payTime: '2023-06-15 14:32:15',
-  transactionId: '202306151432156789123456',
-  productName: '智能音箱 Pro',
-  quantity: 1,
-  unitPrice: 2499.00
+  orderId: '',
+  orderTime: '',
+  amount: 0,
+  method: '',
+  payTime: '',
+  transactionId: '',
+  productName: '',
+  quantity: 0,
+  unitPrice: 0
 });
 
-// 模拟订单数据库
-const orderDatabase = [
-  {
-    orderId: 'ORD98765432',
-    orderTime: '2023-06-15 14:30:22',
-    status: 'success',
-    address: '北京市海淀区中关村南大街5号',
-    phone: '138****1234',
-    products: [
-      {
-        name: '智能音箱 Pro',
-        quantity: 1,
-        price: 2499.00
-      }
-    ]
-  },
-  {
-    orderId: 'ORD87654321',
-    orderTime: '2023-06-10 09:15:33',
-    status: 'shipped',
-    address: '上海市浦东新区张江高科技园区',
-    phone: '139****5678',
-    products: [
-      {
-        name: '智能手表',
-        quantity: 1,
-        price: 1299.00
-      },
-      {
-        name: '蓝牙耳机',
-        quantity: 2,
-        price: 499.00
-      }
-    ]
-  }
-];
+// 不需要订单数据库
 
 // 订单详情弹窗状态
 const showOrderModal = ref(false);
@@ -255,11 +268,38 @@ const getOrderStatusText = (status) => {
 };
 
 // 查看订单详情
-const viewOrderDetails = () => {
-  // 模拟API查询订单
-  const order = orderDatabase.find(o => o.orderId === paymentInfo.orderId);
-  orderDetails.value = order || null;
+const viewOrderDetails = async () => {
+  if (!paymentInfo.orderId) {
+    console.error('没有订单ID，无法查询订单详情');
+    return;
+  }
+  
+  try {
+    // 从API获取订单详情
+    const response = await fetch(`http://10.172.66.224:8084/order/api/orders/${paymentInfo.orderId}`);
+    if (response.ok) {
+      const orderData = await response.json();
+      orderDetails.value = {
+        orderId: orderData.id || orderData.orderId || paymentInfo.orderId,
+        orderTime: orderData.createAt || orderData.createdAt || paymentInfo.orderTime,
+        status: orderData.status || 'processing',
+        address: orderData.shippingAddress || orderData.address || '未提供地址',
+        phone: orderData.phone || orderData.contactPhone || '未提供电话',
+        products: orderData.products || orderData.items || []
+      };
+      
+      // 如果没有商品信息，显示一个提示
+      if (!orderDetails.value.products || orderDetails.value.products.length === 0) {
+        console.warn('订单中没有商品信息');
+      }
+      
   showOrderModal.value = true;
+    } else {
+      console.error('获取订单详情失败，API返回错误状态:', response.status);
+    }
+  } catch (error) {
+    console.error('获取订单详情失败:', error);
+  }
 };
 
 // 关闭弹窗
@@ -341,14 +381,233 @@ function animateParticles() {
   animationId = requestAnimationFrame(animateParticles)
 }
 
+// 获取支付信息
+const fetchPaymentInfo = async () => {
+  try {
+    console.log('获取支付信息...');
+    isLoading.value = true;
+    
+    // 获取当前登录用户信息
+    let currentUser = null;
+    try {
+      const loginUserStr = localStorage.getItem('loginUser');
+      if (loginUserStr) {
+        currentUser = JSON.parse(loginUserStr);
+        console.log('当前登录用户:', currentUser);
+        
+        // 检查用户信息是否包含ID
+        if (currentUser.userID) {
+          // 规范化用户ID字段，确保可以通过id访问
+          currentUser.id = currentUser.userID;
+        }
+        
+        if (!currentUser.id && !currentUser.userId && !currentUser.user_id) {
+          console.warn('登录用户信息中没有找到有效的用户ID字段');
+          console.log('用户信息字段:', Object.keys(currentUser));
+        }
+      }
+    } catch (error) {
+      console.error('获取当前用户信息失败:', error);
+    }
+    
+          // 尝试从API获取支付信息
+      let paymentData;
+      try {
+                // 如果有用户信息，则尝试获取该用户的支付记录
+        if (currentUser) {
+          // 用户ID可能存储在多个不同的字段中
+          const userId = currentUser.id || currentUser.userID || currentUser.userId || currentUser.user_id;
+          
+          // 如果没有找到用户ID，但有用户名，也可以尝试使用
+          if (!userId && currentUser.username) {
+            console.log('未找到用户ID，但找到了用户名:', currentUser.username);
+          }
+          
+                    // 使用找到的用户ID
+          const manualUserId = userId;
+          
+          console.log('当前用户ID:', manualUserId);
+          
+          if (!manualUserId) {
+            console.error('无法确定用户ID，无法获取订单');
+            paymentStatus.value = {
+              id: 'failed',
+              text: '用户ID缺失',
+              class: 'status-failed',
+              message: '无法确定您的用户ID，请重新登录'
+            };
+            isLoading.value = false;
+            return; // 提前返回，不继续处理
+          }
+          
+          try {
+            const response = await fetch(`http://10.172.66.224:8084/payment/api/payments/user/${manualUserId}`);
+          
+          if (response.ok) {
+            const payments = await response.json();
+            console.log('获取到的支付记录:', payments);
+            
+            // 使用最新的一条支付记录
+            if (payments && payments.length > 0) {
+              // 按创建时间排序，获取最新的订单
+              const sortedPayments = payments.sort((a, b) => 
+                new Date(b.createAt || b.updateAt || 0) - new Date(a.createAt || a.updateAt || 0)
+              );
+              paymentData = sortedPayments[0];
+              
+              // 严格检查支付记录是否属于当前用户
+              // 支付记录中的用户ID可能存储在userId或userID字段中
+              const paymentUserId = paymentData.userId || paymentData.userID || paymentData.user_id;
+              
+              // 严格检查支付记录是否属于当前用户
+              if (paymentUserId && paymentUserId.toString() === manualUserId.toString()) {
+                console.log('找到用户最新支付记录:', paymentData);
+              } else {
+                console.warn('支付记录的用户ID与当前用户不匹配!');
+                console.log('支付记录用户ID:', paymentUserId, '当前用户ID:', manualUserId);
+                
+                // 显示没有订单信息
+                paymentStatus.value = {
+                  id: 'failed',
+                  text: '未找到订单',
+                  class: 'status-failed',
+                  message: '未找到您的订单信息，请先购买商品'
+                };
+                return; // 提前返回，不继续处理
+              }
+            } else {
+              console.log('未找到用户支付记录');
+              // 显示没有订单信息
+              paymentStatus.value = {
+                id: 'failed',
+                text: '未找到订单',
+                class: 'status-failed',
+                message: '未找到您的订单信息，请先购买商品'
+              };
+              isLoading.value = false;
+              return; // 提前返回，不继续处理
+            }
+          } else {
+            console.error('获取用户支付记录失败，状态码:', response.status);
+            throw new Error(`API返回错误状态码: ${response.status}`);
+          }
+        } catch (error) {
+          console.error('获取用户支付记录时出错:', error);
+          // 显示错误信息
+                      paymentStatus.value = {
+              id: 'failed',
+              text: '获取失败',
+              class: 'status-failed',
+              message: '获取订单信息失败，请稍后再试'
+            };
+            isLoading.value = false;
+            return; // 提前返回，不继续处理
+        }
+      } else {
+        console.log('未找到当前用户信息，无法获取用户订单');
+        // 显示没有订单信息
+        paymentStatus.value = {
+          id: 'failed',
+          text: '未登录',
+          class: 'status-failed',
+          message: '请先登录后查看您的订单信息'
+        };
+        isLoading.value = false;
+        return; // 提前返回，不继续处理
+      }
+    } catch (error) {
+      console.error('从API获取支付信息失败:', error);
+    }
+    
+    // 如果API获取失败，则显示未找到订单信息
+    if (!paymentData) {
+      console.log('未能获取到支付数据');
+      paymentStatus.value = {
+        id: 'failed',
+        text: '未找到订单',
+        class: 'status-failed',
+        message: '未找到订单信息，请稍后再试或联系客服'
+      };
+      isLoading.value = false;
+      return; // 提前返回，不继续处理
+    }
+    
+    console.log('获取到支付数据:', paymentData);
+    
+    // 再次检查支付数据是否有效
+    if (!paymentData || !paymentData.orderId) {
+      console.warn('支付数据无效或缺少订单ID');
+          paymentStatus.value = {
+      id: 'failed',
+      text: '无效订单',
+      class: 'status-failed',
+      message: '订单信息不完整，请联系客服'
+    };
+    isLoading.value = false;
+    return;
+    }
+    
+    // 更新支付状态
+    const mappedStatus = statusMapping[paymentData.status] || 'pending';
+    paymentStatus.value = statusTypes[mappedStatus];
+    isLoading.value = false;
+    
+    // 更新支付信息
+    paymentInfo.orderId = paymentData.orderId;
+    paymentInfo.orderTime = paymentData.createAt || paymentData.createdAt || '';
+    paymentInfo.amount = paymentData.amount || 0;
+    paymentInfo.method = paymentData.method || 'alipay'; // 默认支付宝
+    paymentInfo.payTime = paymentData.updateAt || paymentData.updatedAt || '';
+    paymentInfo.transactionId = paymentData.transactionId || paymentData.id || '';
+    
+    // 更新商品信息
+    if (paymentData.productDetails) {
+      paymentInfo.productName = paymentData.productDetails.name || '未知商品';
+      paymentInfo.quantity = paymentData.productDetails.quantity || 1;
+      paymentInfo.unitPrice = paymentData.productDetails.unitPrice || paymentData.amount || 0;
+    } else {
+      // 如果没有商品详情，使用订单ID作为商品名称
+      paymentInfo.productName = `订单 ${paymentData.orderId}`;
+      paymentInfo.quantity = 1;
+      paymentInfo.unitPrice = paymentData.amount || 0;
+    }
+    
+    console.log('成功更新支付信息:', paymentInfo);
+    
+  } catch (error) {
+    console.error('获取支付信息失败:', error);
+    paymentStatus.value = {
+      id: 'failed',
+      text: '获取失败',
+      class: 'status-failed',
+      message: '获取订单信息失败，请稍后再试或联系客服'
+    };
+    isLoading.value = false;
+    
+    // 清空支付信息
+    paymentInfo.orderId = '';
+    paymentInfo.orderTime = '';
+    paymentInfo.amount = 0;
+    paymentInfo.method = '';
+    paymentInfo.payTime = '';
+    paymentInfo.transactionId = '';
+    paymentInfo.productName = '';
+    paymentInfo.quantity = 0;
+    paymentInfo.unitPrice = 0;
+  }
+};
+
 onMounted(() => {
-  resizeCanvas()
-  createParticles()
-  animateParticles()
+  resizeCanvas();
+  createParticles();
+  animateParticles();
   window.addEventListener('resize', () => {
-    resizeCanvas()
-    createParticles()
-  })
+    resizeCanvas();
+    createParticles();
+  });
+  
+  // 获取支付信息
+  fetchPaymentInfo();
 })
 
 onBeforeUnmount(() => {
@@ -434,6 +693,12 @@ html, body, #app {
   border: 1px solid rgba(243, 156, 18, 0.3);
 }
 
+.status-loading {
+  background-color: rgba(52, 152, 219, 0.2);
+  color: #3498db;
+  border: 1px solid rgba(52, 152, 219, 0.3);
+}
+
 .payment-result-card {
   display: flex;
   flex-direction: column;
@@ -457,6 +722,14 @@ html, body, #app {
   font-size: 22px;
 }
 
+.result-icon i {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
 .result-icon.success {
   background: rgba(46, 204, 113, 0.15);
   border: 2px solid rgba(46, 204, 113, 0.3);
@@ -473,6 +746,9 @@ html, body, #app {
   background: rgba(243, 156, 18, 0.15);
   border: 2px solid rgba(243, 156, 18, 0.3);
   color: #f39c12;
+}
+
+.result-icon.pending svg {
   animation: spin 2s linear infinite;
 }
 
@@ -854,5 +1130,57 @@ html, body, #app {
   height: 100vh;
   z-index: 0;
   pointer-events: none;
+}
+
+.loading-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  border: 1px solid #ebeef5;
+  margin-bottom: 15px;
+}
+
+.loading-spinner {
+  margin-bottom: 15px;
+}
+
+.loading-spinner svg {
+  animation: spin 2s linear infinite;
+  color: #409eff;
+}
+
+.loading-text {
+  color: #606266;
+  font-size: 14px;
+}
+
+.loading-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  border: 1px solid #ebeef5;
+  margin-bottom: 15px;
+}
+
+.loading-spinner {
+  margin-bottom: 15px;
+}
+
+.loading-spinner svg {
+  animation: spin 2s linear infinite;
+  color: #409eff;
+}
+
+.loading-text {
+  color: #606266;
+  font-size: 14px;
 }
 </style> 
