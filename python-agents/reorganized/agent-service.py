@@ -2,7 +2,7 @@ import time
 from nacos import NacosClient
 
 # 配置Nacos服务器信息
-SERVER_ADDRESSES = "10.172.66.224"
+SERVER_ADDRESSES = "10.172.131.142"
 NAMESPACE = "public"
 
 # 创建Nacos客户端实例
@@ -68,7 +68,7 @@ def send_heartbeat(service_name, ip, port, cluster_name="DEFAULT"):
 def main():
     # 配置服务信息
     SERVICE_NAME = "agents-service"
-    IP = "10.172.66.224"  # 请修改为实际服务IP
+    IP = "10.172.131.142"  # 请修改为实际服务IP
     PORT = 8085  # 请修改为实际服务端口
 
     # 注册服务

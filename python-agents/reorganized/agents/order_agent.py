@@ -16,7 +16,7 @@ sys.path.append(project_root)
 from config import Config
 
 # 假设的 API 基础 URL
-API_BASE_URL = "http://10.172.66.224:8084"
+API_BASE_URL = "http://10.172.131.142:8084"
 
 def create_order(input: str) -> str:
     try:

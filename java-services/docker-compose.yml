@@ -1,16 +1,19 @@
+version: '3.8'
+
 services:
   mysql:
     image: mysql:8
     container_name: mysql-test
     environment:
       MYSQL_ROOT_PASSWORD: 20040412mzq
+      MYSQL_DATABASE: ecommerce_order_db
     ports:
       - "3306:3306"
     volumes:
       - ./.mysql-data:/var/lib/mysql
-    restart: always
     networks:
       - backend
+    restart: always
 
   nacos:
     image: nacos/nacos-server:v2.2.0-slim
@@ -23,12 +26,7 @@ services:
       - backend
     environment:
       - MODE=standalone
-      - SPRING_DATASOURCE_PLATFORM=mysql
-      - MYSQL_MASTER_HOST=mysql-test
-      - MYSQL_MASTER_PORT=3306
-      - MYSQL_MASTER_USER=root
-      - MYSQL_MASTER_PASSWORD=20040412mzq
-      - MYSQL_MASTER_DB_NAME=nacos_config
+      - PREFER_HOST_MODE=hostname
       - TZ=Asia/Shanghai
 
   redis:
@@ -36,10 +34,10 @@ services:
     container_name: redis-test
     ports:
       - "6379:6379"
-    volumes:
-      - ./.redis-data:/data
     networks:
       - backend
+    volumes:
+      - ./.redis-data:/data
 
   elasticsearch:
     image: elasticsearch:7.17.14
@@ -51,53 +49,78 @@ services:
       - "9200:9200"
     networks:
       - backend
+    volumes:
+      - ./data/ES_products.csv:/data/ES_products.csv
+
+  es-init:
+    image: python:3.11-alpine
+    container_name: es-init
+    depends_on:
+      - elasticsearch
+    networks:
+      - backend
+    volumes:
+      - ./data/ES_products.csv:/data/ES_products.csv:ro
+      - ./es_import.py:/es_import.py:ro
+    entrypoint:
+      - sh
+      - -c
+      - |
+        pip install requests
+        python /es_import.py
 
   order-service:
     build:
       context: ./order-service
+      dockerfile: Dockerfile
     container_name: order-service
     ports:
       - "8083:8083"
+    environment:
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql-test:3306/ecommerce_order_db?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC"
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.MySQL8Dialect
+      SPRING_DATASOURCE_USERNAME: "root"
+      SPRING_DATASOURCE_PASSWORD: "20040412mzq"
+      SPRING_CLOUD_NACOS_DISCOVERY_SERVER-ADDR: "nacos-test:8848"
     networks:
       - backend
-    depends_on:
-      - mysql
-      - nacos
 
   payment-service:
     build:
       context: ./payment-service
+      dockerfile: Dockerfile
     container_name: payment-service
     ports:
       - "8081:8081"
+    environment:
+      SPRING_REDIS_HOST: "redis-test"
+      SPRING_REDIS_PORT: "6379"
+      SPRING_CLOUD_NACOS_DISCOVERY_SERVER-ADDR: "nacos-test:8848"
     networks:
       - backend
-    depends_on:
-      - redis
-      - nacos
 
   product-service:
     build:
       context: ./product-service
+      dockerfile: Dockerfile
     container_name: product-service
     ports:
       - "8082:8082"
+    environment:
+      SPRING_ELASTICSEARCH_URIS: "http://elasticsearch-test:9200"
     networks:
       - backend
-    depends_on:
-      - elasticsearch
-      - nacos
-  services-gateway:
+
+  service-gateway:
     build:
       context: ./services-gateway
+      dockerfile: Dockerfile
     container_name: services-gateway
     ports:
       - "8084:8084"
-    depends_on:
-      - nacos
-      - order-service
-      - product-service
-      - payment-service
+    environment:
+      SPRING_CLOUD_NACOS_DISCOVERY_SERVER-ADDR: "nacos:8848"
     networks:
       - backend
 

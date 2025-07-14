@@ -29,6 +29,13 @@ spring:
               filters:
                 - StripPrefix=1
 
+            - id: agents-service
+              uri: http://reorganized:8085
+              predicates:
+                - Path=/agents/**
+              filters:
+                - StripPrefix=1
+
     nacos:
       discovery:
         server-addr: nacos:8848

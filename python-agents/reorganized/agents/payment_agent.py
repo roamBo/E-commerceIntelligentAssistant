@@ -41,7 +41,7 @@ class PaymentConfig:
 class PaymentServiceAPI:
     """支付服务 API 封装"""
 
-    def __init__(self, base_url: str = "http://10.172.66.224:8084/payment"):
+    def __init__(self, base_url: str = "http://10.172.131.142:8084/payment"):
         self.base_url = base_url
         self.session = requests.Session()
         self.session.timeout = 30

@@ -1,0 +1,207 @@
+version: '3.8'
+
+services:
+  # 基础设施服务
+  mysql:
+    image: mysql:8
+    container_name: mysql-test
+    environment:
+      MYSQL_ROOT_PASSWORD: 20040412mzq
+      MYSQL_DATABASE: ecommerce_order_db
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./java-services/.mysql-data:/var/lib/mysql
+    networks:
+      - backend
+    restart: always
+
+  nacos:
+    image: nacos/nacos-server:v2.2.0-slim
+    container_name: nacos-test
+    ports:
+      - "8848:8848"
+    volumes:
+      - ./java-services/.nacos-data:/home/nacos/data
+    networks:
+      - backend
+    environment:
+      - MODE=standalone
+      - PREFER_HOST_MODE=hostname
+      - TZ=Asia/Shanghai
+
+  redis:
+    image: redis:6
+    container_name: redis-test
+    ports:
+      - "6379:6379"
+    networks:
+      - backend
+    volumes:
+      - ./java-services/.redis-data:/data
+
+  elasticsearch:
+    image: elasticsearch:7.17.14
+    container_name: elasticsearch-test
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    networks:
+      - backend
+    volumes:
+      - ./java-services/data/ES_products.csv:/data/ES_products.csv
+
+  es-init:
+    image: python:3.11-alpine
+    container_name: es-init
+    depends_on:
+      - elasticsearch
+    networks:
+      - backend
+    volumes:
+      - ./java-services/data/ES_products.csv:/data/ES_products.csv:ro
+      - ./java-services/es_import.py:/es_import.py:ro
+    entrypoint:
+      - sh
+      - -c
+      - |
+        pip install requests
+        python /es_import.py
+
+  # Java 微服务
+  order-service:
+    build:
+      context: ./java-services/order-service
+      dockerfile: Dockerfile
+    container_name: order-service
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql-test:3306/ecommerce_order_db?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC"
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.MySQL8Dialect
+      SPRING_DATASOURCE_USERNAME: "root"
+      SPRING_DATASOURCE_PASSWORD: "20040412mzq"
+      SPRING_CLOUD_NACOS_DISCOVERY_SERVER-ADDR: "nacos-test:8848"
+    networks:
+      - backend
+    depends_on:
+      - mysql
+      - nacos
+
+  payment-service:
+    build:
+      context: ./java-services/payment-service
+      dockerfile: Dockerfile
+    container_name: payment-service
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_REDIS_HOST: "redis-test"
+      SPRING_REDIS_PORT: "6379"
+      SPRING_CLOUD_NACOS_DISCOVERY_SERVER-ADDR: "nacos-test:8848"
+    networks:
+      - backend
+    depends_on:
+      - redis
+      - nacos
+
+  product-service:
+    build:
+      context: ./java-services/product-service
+      dockerfile: Dockerfile
+    container_name: product-service
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_ELASTICSEARCH_URIS: "http://elasticsearch-test:9200"
+    networks:
+      - backend
+    depends_on:
+      - elasticsearch
+
+  service-gateway:
+    build:
+      context: ./java-services/services-gateway
+      dockerfile: Dockerfile
+    container_name: services-gateway
+    ports:
+      - "8084:8084"
+    environment:
+      SPRING_CLOUD_NACOS_DISCOVERY_SERVER-ADDR: "nacos-test:8848"
+    networks:
+      - backend
+    depends_on:
+      - nacos
+
+  # Python 代理服务
+  reorganized:
+    build:
+      context: ./python-agents/reorganized
+      dockerfile: Dockerfile
+    container_name: reorganized
+    ports:
+      - "8085:8085"
+    volumes:
+      - ./python-agents/reorganized:/app
+    working_dir: /app
+    command: python main.py
+    networks:
+      - backend
+    depends_on:
+      - product-service
+      - order-service
+      - payment-service
+
+#  order-agent:
+#    build:
+#      context: ./python-agents/orderagent
+#    container_name: order-agent
+#    ports:
+#      - "8001:8001"
+#    volumes:
+#      - ./python-agents/orderagent:/app
+#    working_dir: /app
+#    command: python api/app.py
+#    networks:
+#      - backend
+#    depends_on:
+#      - order-service
+
+#  payment-agent:
+#    build:
+#      context: ./python-agents/paymentagent
+#    container_name: payment-agent
+#    ports:
+#      - "8002:8002"
+#    volumes:
+#      - ./python-agents/paymentagent:/app
+#    working_dir: /app
+#    command: python main.py
+#    networks:
+#      - backend
+#    depends_on:
+#      - payment-service
+
+  # 前端服务
+#  frontend-console:
+#    build:
+#      context: ./frontend-console/vue-page
+#      dockerfile: Dockerfile
+#    container_name: frontend-console
+#    ports:
+#      - "5173:5173"
+#    volumes:
+#      - ./frontend-console/vue-page:/app
+#    working_dir: /app
+#    command: npm run dev
+#    networks:
+#      - backend
+#    depends_on:
+#      - service-gateway
+
+networks:
+  backend:
+    driver: bridge
