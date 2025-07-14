@@ -25,7 +25,7 @@ class OrderConfig:
     MODEL_NAME: str = Config.LLM_MODEL_NAME
     MODEL_TEMPERATURE: float = Config.LLM_TEMPERATURE
     MAX_TOKENS: int = 500
-    ORDER_SERVICE_BASE_URL: str = os.environ.get("ORDER_SERVICE_BASE_URL", "http://10.172.66.224:8081/order"  )
+    ORDER_SERVICE_BASE_URL: str = os.environ.get("ORDER_SERVICE_BASE_URL", "http://10.172.66.224:8084/order"  )
 
 
 # ----------------------------------------------------------------------
