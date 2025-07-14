@@ -357,15 +357,25 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+html, body, #app {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
 .payment-system {
-  height: 100%;
-  background: #f5f7fa;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding: 15px;
-  box-sizing: border-box;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  min-height: 100vh;
+  width: 100vw;
   overflow-y: auto;
+  background: #f5f7fa;
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .payment-container {
@@ -381,6 +391,7 @@ onBeforeUnmount(() => {
   gap: 15px;
   position: relative;
   z-index: 1;
+  margin-top: 90px;
 }
 
 .payment-header {

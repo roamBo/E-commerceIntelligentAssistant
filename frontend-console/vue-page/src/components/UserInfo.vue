@@ -30,14 +30,24 @@ const onLogout = () => {
 </script>
 
 <style scoped>
+html, body, #app {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
 .user-info-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
   min-height: 100vh;
   width: 100vw;
   background: linear-gradient(135deg, #0a192f 60%, #64ffda 100%);
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding-top: 120px;
+  padding-top: 0 !important;
+  margin-top: 0 !important;
 }
 .user-info-card {
   background: rgba(255,255,255,0.98);
@@ -52,6 +62,7 @@ const onLogout = () => {
   font-family: 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif;
   position: relative;
   z-index: 2;
+  margin-top: 160px;
 }
 .user-header {
   display: flex;

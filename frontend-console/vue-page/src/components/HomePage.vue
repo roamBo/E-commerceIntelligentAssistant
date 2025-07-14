@@ -2,6 +2,14 @@
   <div class="home-container">
     <!-- 主标语区域 -->
     <div class="hero-section">
+      <!-- 背景视频 - 移动到hero section内部 -->
+      <div class="video-background">
+        <video autoplay loop muted playsinline ref="videoElement">
+          <source :src="`/videos/BG.mp4?v=${videoTimestamp}`" type="video/mp4">
+        </video>
+        <div class="video-overlay"></div>
+      </div>
+      
       <!-- 添加装饰元素 -->
       <div class="hero-decoration dot-grid"></div>
       <div class="hero-decoration wave"></div>
@@ -143,6 +151,8 @@ const solution1 = ref(null);
 const solution2 = ref(null);
 const solution3 = ref(null);
 const solution4 = ref(null);
+const videoElement = ref(null);
+const videoTimestamp = ref(Date.now()); // 添加时间戳防止缓存
 
 // 导航到指定页面
 const navigateTo = (page, e) => {
@@ -159,6 +169,14 @@ const navigateTo = (page, e) => {
 };
 
 onMounted(() => {
+  // 强制重新加载视频
+  if (videoElement.value) {
+    videoElement.value.load();
+    videoElement.value.play().catch(error => {
+      console.warn('视频自动播放失败，可能需要用户交互:', error);
+    });
+  }
+
   // 功能卡片的观察器
   const featureObserver = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
@@ -244,10 +262,21 @@ const scrollToNext = () => {
 </script>
 
 <style scoped>
+/* 导入更加独特的字体 */
+@import url('https://fonts.googleapis.com/css2?family=Audiowide&family=Bungee+Inline&family=Bungee+Shade&family=Chakra+Petch:wght@400;600;700&family=Russo+One&family=Teko:wght@400;500;600&family=ZCOOL+KuaiLe&family=ZCOOL+QingKe+HuangYou&family=Noto+Sans+SC:wght@400;700;900&display=swap');
+
+:root {
+  --main-font: 'Chakra Petch', 'Noto Sans SC', sans-serif;
+  --heading-font: 'Teko', 'ZCOOL QingKe HuangYou', sans-serif;
+  --accent-font: 'Russo One', 'ZCOOL KuaiLe', sans-serif;
+  --tech-font: 'Audiowide', 'ZCOOL KuaiLe', sans-serif;
+}
+
 html, body {
   margin: 0;
   padding: 0;
   height: 100%;
+  font-family: var(--main-font);
 }
 
 .home-container {
@@ -255,13 +284,48 @@ html, body {
   height: 100%;
   overflow-y: auto;
   scroll-behavior: smooth;
-  background: linear-gradient(135deg, #ffffff 0%, #f5f7fa 100%);
   color: #2c3e50;
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
+  font-family: var(--main-font);
+  background: linear-gradient(135deg, #ffffff 0%, #f5f7fa 100%); /* 为非视频区域添加背景 */
+}
+
+/* 视频背景 - 修改为只在hero section显示 */
+.video-background {
+  position: absolute; /* 改为absolute定位，而不是fixed */
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%; /* 设置为100%高度，覆盖整个hero section */
+  z-index: -1;
+  overflow: hidden;
+}
+
+.video-background video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.75; /* 保持视频不透明度 */
+  transition: opacity 1s ease;
+  filter: contrast(1.05) brightness(1.05); /* 保持对比度和亮度设置 */
+}
+
+.video-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    135deg, 
+    rgba(255, 255, 255, 0.55) 0%,
+    rgba(245, 247, 250, 0.5) 100%
+  );
+  backdrop-filter: blur(0px); /* 保持无模糊效果 */
 }
 
 /* 确保每个区块都有合适的高度 - 减少滚动距离 */
@@ -273,6 +337,7 @@ html, body {
   justify-content: center;
   position: relative;
   overflow: hidden;
+  z-index: 1; /* 确保内容在视频上方 */
 }
 
 /* 添加hero section的背景装饰元素 */
@@ -422,12 +487,14 @@ html, body {
   z-index: 1;
 }
 
+/* 为其他区域添加淡化的背景色 */
 .features-section {
   min-height: auto;
-  padding: 80px 20px; /* 增加上下内边距使区域更宽敞 */
+  padding: 80px 20px;
   background: #fff;
   position: relative;
   overflow: hidden;
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.05); /* 添加上方阴影，增加与视频区域的分隔感 */
 }
 
 /* 添加features section的装饰元素 */
@@ -521,10 +588,13 @@ html, body {
 }
 
 .section-header h2 {
-  font-size: 36px;
+  font-size: 42px;
   color: #2c3e50;
   margin-bottom: 20px;
   position: relative;
+  font-family: var(--heading-font);
+  letter-spacing: 1px;
+  text-transform: uppercase;
 }
 
 .section-header p {
@@ -533,6 +603,8 @@ html, body {
   line-height: 1.6;
   max-width: 600px;
   margin: 0 auto;
+  font-family: var(--main-font);
+  letter-spacing: 0.5px;
 }
 
 /* 改进功能卡片设计 */
@@ -604,11 +676,14 @@ html, body {
 }
 
 .feature-card h3 {
-  font-size: 24px;
+  font-size: 28px;
   color: #2c3e50;
   margin-bottom: 25px;
   transition: color 0.3s ease;
   text-align: center;
+  font-family: var(--heading-font);
+  letter-spacing: 1px;
+  text-transform: uppercase;
 }
 
 .feature-card:hover h3 {
@@ -630,6 +705,8 @@ html, body {
   position: relative;
   padding-left: 10px;
   transition: transform 0.3s ease, color 0.3s ease;
+  font-family: var(--main-font);
+  letter-spacing: 0.5px;
 }
 
 .feature-card:hover .feature-list li {
@@ -812,6 +889,7 @@ html, body {
   border-radius: 16px;
   margin-bottom: 20px;
   transition: all 0.3s ease;
+  font-family: var(--accent-font);
 }
 
 .solution-item:hover .solution-icon {
@@ -822,12 +900,15 @@ html, body {
 }
 
 .solution-item h3 {
-  font-size: 24px;
+  font-size: 26px;
   color: #2c3e50;
   margin-bottom: 15px;
   position: relative;
   z-index: 1;
   transition: color 0.3s ease;
+  font-family: var(--tech-font);
+  letter-spacing: 1px;
+  text-transform: uppercase;
 }
 
 .solution-item:hover h3 {
@@ -841,6 +922,8 @@ html, body {
   position: relative;
   z-index: 1;
   transition: color 0.3s ease;
+  font-family: var(--main-font);
+  letter-spacing: 0.5px;
 }
 
 .solution-item:hover p {
@@ -850,22 +933,33 @@ html, body {
 
 .slogan-wrapper {
   margin-bottom: 40px; /* 从60px减少到40px */
+  margin-top: 30px; /* 增加顶部边距，使标题向下移动 */
+  padding-top: 20px; /* 增加内边距，进一步向下移动 */
 }
 
 .sub-heading {
-  font-size: 24px;
+  font-size: 28px;
   color: #666;
   margin-bottom: 20px;
   font-weight: normal;
+  font-family: var(--main-font);
+  letter-spacing: 1px;
+  text-transform: uppercase;
 }
 
 .main-heading {
-  font-size: 48px;
+  font-size: 52px;
   color: #2c3e50;
   font-weight: bold;
   margin-bottom: 40px;
   position: relative;
   z-index: 1;
+  font-family: var(--accent-font);
+  letter-spacing: 1px;
+  background: linear-gradient(to right, #2c3e50, #4c6e8f);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
 }
 
 .main-heading::after {
@@ -1073,14 +1167,19 @@ html, body {
 }
 
 .advantage-item h4 {
-  font-size: 20px;
+  font-size: 22px;
   margin: 15px 0 10px;
   color: #2c3e50;
+  font-family: var(--tech-font);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 
 .advantage-item p {
   color: #666;
   font-size: 16px;
+  font-family: var(--main-font);
+  letter-spacing: 0.5px;
 }
 
 /* 移动端适配 */
@@ -1396,6 +1495,21 @@ html, body {
   }
   60% {
     transform: translateY(-5px) translateX(-50%);
+  }
+}
+
+/* 为背景视频添加响应式处理 */
+@media (max-width: 768px) {
+  .video-background video {
+    opacity: 0.65;
+  }
+  
+  .video-overlay {
+    background: linear-gradient(
+      135deg, 
+      rgba(255, 255, 255, 0.65) 0%,
+      rgba(245, 247, 250, 0.6) 100%
+    );
   }
 }
 </style>
