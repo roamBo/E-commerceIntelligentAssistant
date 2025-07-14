@@ -15,8 +15,8 @@ public class Order {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String orderId;
-    private Long userId;
-    @Min(0) // XXXX totalAmount 不能为负数 (已存在，确认)
+    private String userId; // 已将 userId 类型从 Long 改为 String
+    @Min(0) // totalAmount 不能为负数 (已存在, 确认)
     private Double totalAmount; // 此字段将由商品价格总和计算得到
     private LocalDateTime orderTime;
     private String status;
@@ -54,10 +54,10 @@ public class Order {
     }
 
     public Order() {}
-    // XXXX 修正：构造函数不再接收 totalAmount 参数，它将由items计算得到
-    public Order(String orderId, Long userId, LocalDateTime orderTime, String status, String shippingAddress, List<OrderItem> items) {
+    // 构造函数已更新，现在接受 String 类型的 userId
+    public Order(String orderId, String userId, LocalDateTime orderTime, String status, String shippingAddress, List<OrderItem> items) {
         this.orderId = orderId;
-        this.userId = userId;
+        this.userId = userId; // 参数类型已更改
         this.orderTime = orderTime;
         this.status = status;
         this.shippingAddress = shippingAddress;
