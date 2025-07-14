@@ -2,6 +2,17 @@
   <div class="shopping-guide">
     <canvas ref="bgCanvas" class="bg-particles"></canvas>
     <div class="guide-content">
+      <!-- 登录提醒遮罩 -->
+      <div v-if="!isLoggedIn" class="login-overlay">
+        <div class="login-reminder">
+          <div class="reminder-icon">🔒</div>
+          <h3>请先登录</h3>
+          <p>您需要登录后才能使用个性化导购助手</p>
+          <p class="login-hint">登录后即可享受个性化商品推荐、订单管理和支付服务</p>
+          <el-button type="primary" @click="goToLogin">立即登录</el-button>
+        </div>
+      </div>
+
       <div class="chat-container">
         <div class="chat-header">
           <h2>个性化导购助手</h2>
@@ -23,9 +34,9 @@
               <h3>您好！我是您的个性化导购助手</h3>
               <p class="welcome-hint">您可以直接告诉我您需要什么商品，我将帮您完成推荐商品、购买下单、支付和物流跟踪的全流程服务。</p>
               <div class="quick-actions">
-                <el-button size="small" @click="quickSend('如何使用这个导购助手？')">如何使用导购助手</el-button>
-                <el-button size="small" @click="quickSend('你能提供哪些服务？')">查看服务范围</el-button>
-                <el-button size="small" @click="quickSend('联系客服')">联系客服</el-button>
+                <el-button size="small" @click="quickSend('如何使用这个导购助手？')" :disabled="!isLoggedIn">如何使用导购助手</el-button>
+                <el-button size="small" @click="quickSend('你能提供哪些服务？')" :disabled="!isLoggedIn">查看服务范围</el-button>
+                <el-button size="small" @click="quickSend('联系客服')" :disabled="!isLoggedIn">联系客服</el-button>
               </div>
             </div>
           </div>
@@ -72,14 +83,14 @@
               v-model="input"
               placeholder="请描述您想找的商品或询问导购助手..."
               @keyup.enter="sendMsg"
-              :disabled="isProcessing"
+              :disabled="isProcessing || !isLoggedIn"
               clearable
           >
             <template #append>
               <el-button
                   :icon="isProcessing ? 'el-icon-loading' : 'el-icon-s-promotion'"
                   @click="sendMsg"
-                  :disabled="!input.trim() || isProcessing"
+                  :disabled="!input.trim() || isProcessing || !isLoggedIn"
               >发送</el-button>
             </template>
           </el-input>
@@ -88,12 +99,12 @@
 
       <!-- 侧边快捷功能 -->
       <div class="side-panel">
-        <div class="side-card" @click="quickSend('帮我查一下我下了什么订单', true)">
+        <div class="side-card" @click="isLoggedIn && quickSend('帮我查一下我下了什么订单', true)" :class="{'disabled': !isLoggedIn}">
           <div class="side-icon">🛒</div>
           <div class="side-title">订单查询</div>
           <div class="side-desc">一键查询我的所有订单</div>
         </div>
-        <div class="side-card" @click="quickSend('帮我查一下我要付多少钱')">
+        <div class="side-card" @click="isLoggedIn && quickSend('帮我查一下我要付多少钱')" :class="{'disabled': !isLoggedIn}">
           <div class="side-icon">💰</div>
           <div class="side-title">支付查询</div>
           <div class="side-desc">快速查看应付金额</div>
@@ -104,7 +115,7 @@
 </template>
 
 <script setup>
-import { ref, nextTick, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, nextTick, watch, onMounted, onBeforeUnmount, computed } from 'vue'
 // import ParticleAnimation from './ParticleAnimation.vue'
 
 const chatBody = ref(null)
@@ -123,9 +134,26 @@ const PARTICLE_SPEED = [0.1, 0.3]
 let particles = []
 const EMOJIS = ['🛒', '🎁', '💰', '🏷️', '📱', '💻', '👕', '👟', '⭐', '💳', '📦']
 
+// 检查用户是否登录
+const isLoggedIn = computed(() => {
+  try {
+    return !!localStorage.getItem('loginUser')
+  } catch (e) {
+    return false
+  }
+})
+
+// 定义emit以便与父组件通信
+const emit = defineEmits(['goLogin'])
+
+// 跳转到登录页面
+function goToLogin() {
+  emit('goLogin')
+}
+
 function sendMsg() {
   const text = input.value.trim()
-  if (!text || isProcessing.value) return
+  if (!text || isProcessing.value || !isLoggedIn.value) return
 
   handleUserInput(text)
   input.value = ''
@@ -134,7 +162,7 @@ function sendMsg() {
 }
 
 function quickSend(text, isOrder) {
-  if (isProcessing.value) return
+  if (isProcessing.value || !isLoggedIn.value) return
 
   handleUserInput(text, isOrder)
   scrollToBottom()
@@ -751,6 +779,15 @@ function animateParticles() {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 }
 
+.side-card.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+  filter: grayscale(0.5);
+  border-color: #dcdfe6;
+  box-shadow: none;
+}
+
 .side-icon {
   font-size: 32px;
   margin-bottom: 10px;
@@ -913,5 +950,77 @@ function animateParticles() {
   height: 100vh;
   z-index: 0;
   pointer-events: none;
+}
+
+/* 登录提醒遮罩 */
+.login-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  backdrop-filter: blur(5px);
+}
+
+.login-reminder {
+  background: #ffffff;
+  padding: 30px;
+  border-radius: 10px;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  max-width: 400px;
+  width: 90%;
+}
+
+.reminder-icon {
+  font-size: 60px;
+  color: #409eff;
+  margin-bottom: 20px;
+}
+
+.login-reminder h3 {
+  color: #303133;
+  font-size: 22px;
+  margin-bottom: 10px;
+}
+
+.login-reminder p {
+  color: #606266;
+  font-size: 16px;
+  margin-bottom: 25px;
+  line-height: 1.6;
+}
+
+.login-hint {
+  color: #909399 !important;
+  font-size: 14px !important;
+  margin-bottom: 25px;
+  background-color: #f0f9eb;
+  border-radius: 4px;
+  padding: 10px;
+  border-left: 3px solid #67c23a;
+}
+
+.login-reminder .el-button {
+  background: #409eff;
+  border: none;
+  color: white;
+  padding: 12px 25px;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: bold;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
+}
+
+.login-reminder .el-button:hover {
+  background: #66b1ff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.4);
 }
 </style> 
