@@ -38,6 +38,7 @@ class Product(BaseModel):
 class ChatRequest(BaseModel):
     user_input: str = Field(..., description="用户的输入消息")
     session_id: str = Field(..., description="用户的会话ID，用于区分不同用户的对话历史")
+    user_id: str = Field(..., description="用户唯一标识符")
 
 # --- API 响应体模型 ---
 class ChatResponse(BaseModel):
@@ -51,6 +52,7 @@ class AgentState(TypedDict):
     """
     user_input: str # 用户当前输入
     session_id: str # 会话ID
+    user_id: str
     chat_history: List[BaseMessage] # 整个对话历史，由监管者Agent维护
     # 各个子Agent的输出或中间结果
     guide_agent_output: Optional[str]

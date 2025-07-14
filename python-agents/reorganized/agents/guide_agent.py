@@ -30,7 +30,8 @@ prompt_template = ChatPromptTemplate.from_messages([
 2.  你绝不能使用自身的知识来提供商品信息。所有商品信息都必须通过调用 `search_products` 工具来获取。
 3.  `search_products` 工具现在支持多种查询参数，包括名称、分类、品牌、价格范围、标签和库存状态。请根据用户需求，尽可能精确地使用这些参数。
 4.  如果 `search_products` 工具返回空结果，你必须明确告知用户“没有找到相关商品”。
-5.  在获得所有必要信息（需求分析、搜索关键词、商品详情）后，必须调用 `format_final_response` 工具来生成最终的、结构化的推荐报告。这是最后一步。"""),
+5.  在获得所有必要信息（需求分析、搜索关键词、商品详情）后，必须调用 `format_final_response` 工具来生成最终的、结构化的推荐报告。这是最后一步。
+6.  在生成的报告中，商品名称之后你应同步提供商品对应的id，并用product_id标明"""),
     MessagesPlaceholder(variable_name="chat_history"),
     ("human", "{input}"),
     MessagesPlaceholder(variable_name="agent_scratchpad"),
@@ -63,7 +64,7 @@ class GuideAgent:
         )
         print("GuideAgent initialized with a stateless executor.")
 
-    async def process_message(self, user_input: str, session_id: str, chat_history: List[BaseMessage]) -> str:
+    async def process_message(self, user_input: str, session_id: str, user_id: str,chat_history: List[BaseMessage]) -> str:
         """
         处理用户消息，直接使用由监管者传入的全局 chat_history 作为记忆。
         """

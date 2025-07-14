@@ -467,7 +467,7 @@ class PaymentAgent:
 
     # async def process_message(self, user_input: str, session_id: str) -> str:
     # 【修改】: 重写核心方法，让 process_message 接收并使用 chat_history
-    async def process_message(self, user_input: str, session_id: str, chat_history: List[BaseMessage]) -> str:
+    async def process_message(self, user_input: str, session_id: str, user_id:str, chat_history: List[BaseMessage]) -> str:
         """
         处理用户消息，使用传入的全局 chat_history 作为记忆。
         """
