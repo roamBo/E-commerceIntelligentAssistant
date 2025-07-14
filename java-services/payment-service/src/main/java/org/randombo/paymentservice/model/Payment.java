@@ -22,7 +22,7 @@ public class Payment implements Serializable {
     private String orderId;
     @Indexed
     private String userId;
-    private BigDecimal amount;
+    private Double amount;
     @Indexed
     private String status; //PENDING, SUCCESS, FAILED
     private LocalDateTime createAt;
