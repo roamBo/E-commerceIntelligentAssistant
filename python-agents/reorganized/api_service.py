@@ -1,4 +1,4 @@
-# main.py
+# api_service.py
 import nest_asyncio
 nest_asyncio.apply() # 解决 asyncio.run() 错误
 
@@ -119,6 +119,9 @@ async def chat_endpoint(request: ChatRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"内部服务器错误: {e}")
 
+def run_fastapi():
+    uvicorn.run(app, host="0.0.0.0", port=8085)
+
 # --- 运行 FastAPI 应用 ---
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8085)
+    run_fastapi()
