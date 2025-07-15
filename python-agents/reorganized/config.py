@@ -15,6 +15,9 @@ class Config:
     # Redis 配置
     REDIS_URL: str = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 
+    # LangChain API 配置
+    LANGCHAIN_API_KEY: str = os.environ.get("LANGCHAIN_API_KEY")
+
     # 外部商品 API 配置 (可选)
     PRODUCT_API_BASE_URL: Optional[str] = os.environ.get("PRODUCT_API_BASE_URL")
     # 根据 PRODUCT_API_BASE_URL 是否设置来决定是否使用外部API

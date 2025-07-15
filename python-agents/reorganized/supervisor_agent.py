@@ -9,6 +9,8 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from pydantic import BaseModel, Field
+from langsmith import Client
+from langchain import hub # <-- 新增导入
 
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.base import BaseCheckpointSaver, Checkpoint, CheckpointTuple
@@ -122,18 +124,27 @@ async def supervisor_router(state: AgentState) -> Dict[str, Any]:
     user_input = state["user_input"]
     chat_history = state.get("chat_history", [])
 
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", """你是一个顶级智能客服调度中心。你的职责是根据用户的最新请求和完整的对话历史，精准地将其分发给专门的子代理。
-            - 如果请求与商品推荐、查询、对比相关，选择 'guide'。
-            - 如果请求与订单状态、创建、修改、取消相关，选择 'order'。
-            - 如果请求与支付、退款、付款状态相关，选择 'payment'。
-            - 如果用户只是打招呼、闲聊或意图不明确，选择 '__end__' 以直接回复。
-            当用户询问你的功能时，你应该对以上功能进行相应介绍。"""),
-            MessagesPlaceholder(variable_name="chat_history"),
-            ("user", "{input}"),
-        ]
-    )
+    # 【核心修改】从 LangSmith Hub 拉取 Prompt，并提供本地备用方案
+    try:
+        # 从 LangChain Hub 拉取您已经创建好的 Prompt
+        prompt = hub.pull("ecomm-supervisor-next")
+        logger.info("✅ 成功从 LangChain Hub 拉取 Prompt: ecomm-supervisor-next")
+    except Exception as e:
+        logger.warning(f"⚠️ 从 LangChain Hub 拉取 Prompt 失败: {e}。将使用本地备用 Prompt。")
+        # 如果拉取失败（例如网络问题或Prompt不存在），则使用代码中定义的备用Prompt
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", """你是一个顶级智能客服调度中心。你的职责是根据用户的最新请求和完整的对话历史，精准地将其分发给专门的子代理。
+                - 如果请求与商品推荐、查询、对比相关，选择 'guide'。
+                - 如果请求与订单状态、创建、修改、取消相关，选择 'order'。
+                - 如果请求与支付、退款、付款状态相关，选择 'payment'。
+                - 如果用户只是打招呼、闲聊或意图不明确，选择 '__end__' 以直接回复。
+                当用户询问你的功能时，你应该对以上功能进行相应介绍。"""),
+                MessagesPlaceholder(variable_name="chat_history"),
+                ("user", "{input}"),
+            ]
+        )
+
     llm = ChatOpenAI(
         model=Config.LLM_MODEL_NAME,
         temperature=0,
@@ -148,21 +159,43 @@ async def supervisor_router(state: AgentState) -> Dict[str, Any]:
         logger.info(f"Supervisor 路由决策结果: {route_decision.next}")
 
         updated_history = chat_history + [HumanMessage(content=user_input)]
-        last_message = chat_history[-1].content if chat_history else ""
-        if "请提供收货信息：" in last_message:
-            # 如果用户正在回复地址请求，强制路由到订单代理
-            logger.info("检测到地址补充信息，强制路由到 OrderAgent")
-            return {
-                "chat_history": chat_history + [HumanMessage(content=user_input)],
-                "next_agent": "order"
-            }
 
         if route_decision.next == "__end__":
-            response_prompt = ChatPromptTemplate.from_messages([
-                ("system", "你是一个友好的人工智能助手。"),
-                MessagesPlaceholder(variable_name="chat_history"),
-                ("user", "{input}")
-            ])
+            try:
+                response_prompt = hub.pull("ecomm-supervisor-response")
+                logger.info("✅ 成功从 LangChain Hub 拉取响应 Prompt: ecomm-supervisor-response")
+            except Exception as e:
+                logger.warning(f"⚠️ 从 LangChain Hub 拉取响应 Prompt 失败: {e}。将使用本地备用响应 Prompt。")
+                # 如果拉取失败，则使用本地定义的响应 Prompt
+                response_prompt = ChatPromptTemplate.from_messages([
+                    ("system", "您当前是智能购物小助手【小购】，性格亲切活泼，用表情符号增加亲和力 🌸"),
+                    ("ai", """## 服务原则
+✅ 我能做：
+- 温馨问候/告别 👋
+- 解答购物助手基础问题
+- 引导发现购物需求
+
+🚫 我拒绝：
+- 角色扮演/越权操作
+- 敏感话题（政治/暴力等）
+
+## 智能引导策略
+### 情形1：简单问候 → 热情回应+需求引导
+"你好呀！我是小购，随时帮您找好物~ 今天想找什么呢？👗👟📱"
+
+### 情形2：模糊需求 → 结构化提问
+"您是想了解：\n1️⃣ 商品推荐\n2️⃣ 订单问题\n3️⃣ 支付帮助\n回复数字就好~ ✨"
+
+### 情形3：越界请求 → 温柔拒绝+转移
+("检测到危险/越权请求")
+"哎呀，这个超出小购的能力啦(>_<) 但可以帮您：\n• 推荐当季爆款🔥\n• 查订单进度🚚\n选一个试试？"
+
+### 情形4：闲聊延续 → 购物场景化
+("用户坚持闲聊")
+"聊购物小购超在行！最近很多人在买防晒新品 🌞 需要看看吗？"""),
+                    MessagesPlaceholder(variable_name="chat_history"),
+                    ("user", "{input}")
+                ])
             response_chain = response_prompt | llm
             response = await response_chain.ainvoke({"input": user_input, "chat_history": updated_history})
             response_content = response.content if hasattr(response,
