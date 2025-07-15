@@ -1,8 +1,9 @@
 import time
 from nacos import NacosClient
+import logging
 
 # 配置Nacos服务器信息
-SERVER_ADDRESSES = "10.172.131.142"
+SERVER_ADDRESSES = "nacos-test:8848"
 NAMESPACE = "public"
 
 # 创建Nacos客户端实例
@@ -34,6 +35,7 @@ def register_service(service_name, ip, port, weight=1.0, cluster_name="DEFAULT")
             cluster_name=cluster_name
         )
         print(f"服务 {service_name} 注册结果: {result}")
+        logging.info(f"服务 {service_name} 注册结果: {result}")
         return True
     except Exception as e:
         print(f"服务注册失败: {e}")
@@ -68,12 +70,13 @@ def send_heartbeat(service_name, ip, port, cluster_name="DEFAULT"):
 def main():
     # 配置服务信息
     SERVICE_NAME = "agents-service"
-    IP = "10.172.131.142"  # 请修改为实际服务IP
+    IP = "nacos-test:8848"  # 请修改为实际服务IP
     PORT = 8085  # 请修改为实际服务端口
 
     # 注册服务
     if register_service(SERVICE_NAME, IP, PORT):
         print(f"服务 {SERVICE_NAME} 注册成功")
+        logging.info(f"服务 {SERVICE_NAME} 注册成功")
 
         # 模拟服务运行，定期发送心跳
         try:

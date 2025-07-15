@@ -41,6 +41,7 @@ services:
       - "8082:8082"
     environment:
       SPRING_ELASTICSEARCH_URIS: "http://elasticsearch-test:9200"
+      SPRING_CLOUD_NACOS_DISCOVERY_SERVER-ADDR: "nacos-test:8848"
     networks:
       - backend
 
@@ -78,6 +79,27 @@ services:
       - product-service
       - order-service
       - payment-service
+
+  # 前端服务
+  frontend-console:
+    build:
+      context: ./frontend-console/vue-page
+      dockerfile: Dockerfile
+    container_name: frontend-console
+    ports:
+      - "80:5173"  # 将宿主机 80 映射到 Vite 默认开发端口 5173
+    volumes:
+      - ./frontend-console/vue-page:/app     # 映射项目代码目录
+      - /app/node_modules                    # 避免宿主机 node_modules 覆盖容器内依赖
+    environment:
+      - CHOKIDAR_USEPOLLING=true             # 启用轮询监听，兼容 Docker 宿主机文件变更
+    working_dir: /app
+    command: npm run dev
+    networks:
+      - backend
+    depends_on:
+      - service-gateway
+
 
 networks:
   backend:

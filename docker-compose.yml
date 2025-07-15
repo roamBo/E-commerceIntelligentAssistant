@@ -70,7 +70,7 @@ services:
         pip install requests
         python /es_import.py
 
-  # Java 微服务
+  # 应用服务
   order-service:
     build:
       context: ./java-services/order-service
@@ -117,10 +117,12 @@ services:
       - "8082:8082"
     environment:
       SPRING_ELASTICSEARCH_URIS: "http://elasticsearch-test:9200"
+      SPRING_CLOUD_NACOS_DISCOVERY_SERVER-ADDR: "nacos-test:8848"
     networks:
       - backend
     depends_on:
       - elasticsearch
+      - nacos
 
   service-gateway:
     build:
@@ -146,61 +148,37 @@ services:
       - "8085:8085"
     volumes:
       - ./python-agents/reorganized:/app
+    environment:
+      - REDIS_URL=redis://redis-test:6379/0
     working_dir: /app
-    command: python main.py
+    command: python main.py agent-service.py
     networks:
       - backend
     depends_on:
       - product-service
       - order-service
       - payment-service
-
-#  order-agent:
-#    build:
-#      context: ./python-agents/orderagent
-#    container_name: order-agent
-#    ports:
-#      - "8001:8001"
-#    volumes:
-#      - ./python-agents/orderagent:/app
-#    working_dir: /app
-#    command: python api/app.py
-#    networks:
-#      - backend
-#    depends_on:
-#      - order-service
-
-#  payment-agent:
-#    build:
-#      context: ./python-agents/paymentagent
-#    container_name: payment-agent
-#    ports:
-#      - "8002:8002"
-#    volumes:
-#      - ./python-agents/paymentagent:/app
-#    working_dir: /app
-#    command: python main.py
-#    networks:
-#      - backend
-#    depends_on:
-#      - payment-service
+      - redis
 
   # 前端服务
-#  frontend-console:
-#    build:
-#      context: ./frontend-console/vue-page
-#      dockerfile: Dockerfile
-#    container_name: frontend-console
-#    ports:
-#      - "5173:5173"
-#    volumes:
-#      - ./frontend-console/vue-page:/app
-#    working_dir: /app
-#    command: npm run dev
-#    networks:
-#      - backend
-#    depends_on:
-#      - service-gateway
+  frontend-console:
+    build:
+      context: ./frontend-console/vue-page
+      dockerfile: Dockerfile
+    container_name: frontend-console
+    ports:
+      - "80:5173"
+    volumes:
+      - ./frontend-console/vue-page:/app
+      - /app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    working_dir: /app
+    command: npm run dev
+    networks:
+      - backend
+    depends_on:
+      - service-gateway
 
 networks:
   backend:

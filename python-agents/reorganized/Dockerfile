@@ -7,4 +7,11 @@ RUN pip install -r requirements.txt
 
 COPY . .
 
-CMD ["python", "main.py", "agent-service.py"]
+#CMD ["python", "agent-service.py"]
+#CMD ["python", "main.py"]
+
+#CMD ["sh", "-c", "python agent-service.py & python main.py"]
+
+RUN chmod +x start.sh
+
+CMD ["./start.sh"]
