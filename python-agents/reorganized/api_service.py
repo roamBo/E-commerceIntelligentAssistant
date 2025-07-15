@@ -1,4 +1,4 @@
-# main.py
+# api_service.py
 import nest_asyncio
 nest_asyncio.apply() # 解决 asyncio.run() 错误
 
@@ -85,10 +85,17 @@ origins = [
     "*"
 ]
 
+from dotenv import load_dotenv
+load_dotenv()
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "").split(",")
+# print(ALLOWED_ORIGINS)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=True,
+    # allow_origins=ALLOWED_ORIGINS,
+    # allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
   )
@@ -98,10 +105,11 @@ app.add_middleware(
 async def chat_endpoint(request: ChatRequest):
     session_id = request.session_id
     user_input = request.user_input
+    user_id = request.user_id
 
     try:
         workflow = await get_multi_agent_workflow()
-        final_response_text = await workflow.invoke_workflow(user_input, session_id)
+        final_response_text = await workflow.invoke_workflow(user_input, session_id, user_id)
         print(f"DEBUG: chat_endpoint returning: {final_response_text}") # 添加日志
         return ChatResponse(response=final_response_text, session_id=session_id)
 
@@ -111,6 +119,9 @@ async def chat_endpoint(request: ChatRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"内部服务器错误: {e}")
 
+def run_fastapi():
+    uvicorn.run(app, host="0.0.0.0", port=8085)
+
 # --- 运行 FastAPI 应用 ---
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8085) # 端口改为 8000，避免与之前 8085 冲突
+    run_fastapi()

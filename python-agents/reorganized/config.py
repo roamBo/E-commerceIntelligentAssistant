@@ -20,6 +20,8 @@ class Config:
     # 根据 PRODUCT_API_BASE_URL 是否设置来决定是否使用外部API
     USE_EXTERNAL_PRODUCT_API: bool = bool(PRODUCT_API_BASE_URL)
 
+    # ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "").split(",")
+
     # 验证配置
     @classmethod
     def validate(cls):

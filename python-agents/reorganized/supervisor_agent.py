@@ -148,6 +148,14 @@ async def supervisor_router(state: AgentState) -> Dict[str, Any]:
         logger.info(f"Supervisor 路由决策结果: {route_decision.next}")
 
         updated_history = chat_history + [HumanMessage(content=user_input)]
+        last_message = chat_history[-1].content if chat_history else ""
+        if "请提供收货信息：" in last_message:
+            # 如果用户正在回复地址请求，强制路由到订单代理
+            logger.info("检测到地址补充信息，强制路由到 OrderAgent")
+            return {
+                "chat_history": chat_history + [HumanMessage(content=user_input)],
+                "next_agent": "order"
+            }
 
         if route_decision.next == "__end__":
             response_prompt = ChatPromptTemplate.from_messages([
@@ -194,7 +202,7 @@ class MultiAgentWorkflow:
         logger.info("所有 Agent 初始化完成。")
         self.is_initialized = True
 
-    async def invoke_workflow(self, user_input: str, session_id: str) -> str:
+    async def invoke_workflow(self, user_input: str, session_id: str, user_id: str) -> str:
         """
         重写整个调用流程，手动管理状态传递，不再使用 graph.ainvoke。
         """
@@ -212,7 +220,7 @@ class MultiAgentWorkflow:
             chat_history = checkpoint_tuple.checkpoint["channel_values"]["chat_history"]
 
         # 3. 调用 supervisor 节点
-        supervisor_input_state = AgentState(user_input=user_input, session_id=session_id, chat_history=chat_history)
+        supervisor_input_state = AgentState(user_input=user_input, session_id=session_id, user_id=user_id, chat_history=chat_history)
         supervisor_output = await supervisor_router(supervisor_input_state)
 
         next_agent_name = supervisor_output.get("next_agent")
@@ -230,7 +238,7 @@ class MultiAgentWorkflow:
             target_agent = agent_map[next_agent_name]
 
             agent_result = await target_agent.process_message(
-                user_input=user_input, session_id=session_id, chat_history=updated_history
+                user_input=user_input, session_id=session_id, user_id=user_id, chat_history=updated_history
             )
 
             final_response = agent_result
