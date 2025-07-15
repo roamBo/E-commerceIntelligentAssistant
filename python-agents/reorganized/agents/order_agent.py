@@ -40,14 +40,15 @@ class OrderServiceAPI:
         self.session.timeout = 120
         self.logger = logging.getLogger(__name__)
 
-    async def create_order(self, user_id: str, products: List[Dict[str, Any]], status: str = "PENDING_PAYMENT") -> Dict[
+    async def create_order(self, user_id: str, products: List[Dict[str, Any]],address:str, status: str = "PENDING_PAYMENT") -> Dict[
         str, Any]:
         """创建新订单"""
         url = f"{self.base_url}/api/orders"
         data = {
             "userId": user_id,
             "products": products,
-            "status": status
+            "status": status,
+            "address":address
         }
         try:
             response = await asyncio.to_thread(self.session.post, url, json=data)
@@ -137,15 +138,37 @@ def create_order_tool(order_agent):
     async def _create_order(order_data: str) -> str:
         """创建新订单，参数为JSON格式字符串"""
         try:
+            # 添加更健壮的 JSON 解析
             try:
                 data = json.loads(order_data)
             except json.JSONDecodeError:
-                return "参数格式错误。输入必须是包含 user_id 和 products 列表的JSON字符串。"
-            user_id = data.get("user_id")
-            products = data.get("products")
-            if not all([user_id, products]):
-                return "缺少必要参数：user_id、products"
-            result = await order_agent.create_order(user_id, products)
+                return "❌ 参数格式错误：必须是有效的JSON格式"
+
+            # 检查必需字段
+            required_fields = ["user_id", "products", "address"]
+            missing = [field for field in required_fields if field not in data]
+            if missing:
+                return f"❌ 缺少必要字段：{', '.join(missing)}"
+
+            # 获取参数（添加默认值防止None）
+            user_id = data.get("user_id", "").strip()
+            products = data.get("products", [])  # 默认空列表
+            address = data.get("address", "")
+
+            # 处理地址（兼容字典/字符串）
+            if isinstance(address, dict):
+                address_str = f"{address.get('name', '')}，{address.get('phone', '')}，{address.get('detail', '')}"
+            else:
+                address_str = str(address).strip()
+
+            # 提前验证商品列表（防止进入create_order才报错）
+            if not isinstance(products, list):
+                return "❌ 商品列表必须是数组格式"
+            if len(products) == 0:
+                return "❌ 商品列表不能为空"
+
+            # 调用服务（使用字符串地址）
+            result = await order_agent.create_order(user_id, products, address_str)
             if result["success"]:
                 return f"订单创建成功：{json.dumps(result['data'], ensure_ascii=False)}"
             else:
@@ -157,7 +180,7 @@ def create_order_tool(order_agent):
         name="create_order",
         func=_create_order_sync, # 【修改】提供一个同步函数
         coro=_create_order,      # 【修改】同时提供异步函数
-        description="创建新订单。输入必须是包含 user_id 和 products 列表的JSON字符串。"
+        description="创建新订单。输入必须是包含 user_id address(字符串或{name,phone,detail}字典)和 products列表的JSON字符串。"
     )
 
 
@@ -226,7 +249,7 @@ def update_order_status_tool(order_agent):
             try:
                 data = json.loads(status_data)
             except json.JSONDecodeError:
-                return "参数格式错误。输入必须是包含 order_id 和 status 的JSON字符串。"
+                return "参数格式错误。输入必须是包含 order_id 和 status的JSON字符串。"
             order_id = data.get("order_id")
             status = data.get("status")
             if not all([order_id, status]):
@@ -326,29 +349,30 @@ class OrderAgent:
         # 初始化工具
         tools = self._get_order_tools()
 
-        # Prompt 模板
         prompt = ChatPromptTemplate.from_messages([
             ("system", """你是专业的订单助手。你的核心任务是根据用户的指令和对话历史，调用工具来处理订单。
 
-**工作流程:**
-1.  **分析意图**: 仔细分析用户的最新输入和完整的对话历史，理解用户的具体需求（如下单、查单、取消等）。
-2.  **提取信息**:
-    -   **下单时**: 你必须从对话历史中找到用户想要下单的商品名称和对应的 `product_id`。`GuideAgent` 的推荐报告里包含了 `product_id`。
-    -   **用户ID**: 用户的 `user_id` 会在输入中直接提供给你，你必须使用它。
-    -   **其他信息**: 根据需要从对话历史或用户输入中提取订单ID、新状态等。
-3.  **调用工具**: 使用提取到的信息，以正确的JSON格式调用相应的工具。
-    -   `create_order` 工具需要 `user_id` 和 `products` 列表。
-4.  **响应用户**: 根据工具的执行结果，生成清晰、友好的回复。
+        **工作流程:**
+        1.  **分析意图**: 仔细分析用户的最新输入和完整的对话历史，理解用户的具体需求。
+        2.  **收集信息**:
+            -   **创建订单时**: 必须从对话历史中提取完整信息：
+                • 商品列表（product_id和数量）
+                • 收货人姓名
+                • 收货人联系电话
+                • 详细收货地址（省市区+街道门牌号）
+            -   如果缺少任何信息，必须明确要求用户提供
+        3.  **调用工具**: 使用提取的信息调用创建订单工具
+        4.  **响应用户**: 根据工具结果生成回复
 
-**重要规则:**
--   绝不虚构信息。所有操作都必须基于工具的调用。
--   如果缺少必要信息（例如在对话历史中找不到 `product_id`），必须向用户提问以获取信息。
--   严格遵守订单状态流程：PENDING_PAYMENT -> PAID -> DELIVERED -> FINISHED。CANCELLED 状态可以在 PENDING_PAYMENT 或 PAID 时进入。"""),
+        **重要规则:**
+        - 收货地址必须是完整的省市区+街道门牌号
+        - 如果用户未提供收货信息，返回固定格式提示：
+          "请提供收货信息：[姓名]，[电话]，[完整地址]"
+        - 绝不虚构信息"""),  # <-- 这里是修改后的提示词
             MessagesPlaceholder(variable_name="chat_history"),
             ("human", "User ID: {user_id}\nUser Request: {input}"),
             MessagesPlaceholder(variable_name="agent_scratchpad"),
         ])
-
         # 创建 agent
         base_agent = create_tool_calling_agent(
             llm=llm,
@@ -406,17 +430,22 @@ class OrderAgent:
     # ----------------------------------------------------------------------
     # 业务逻辑方法 (无变化)
     # ----------------------------------------------------------------------
-    async def create_order(self, user_id: str, products: List[Dict[str, Any]]) -> Dict[str, Any]:
+    async def create_order(self, user_id: str,address:str, products: List[Dict[str, Any]]) -> Dict[str, Any]:
         """创建新订单"""
         try:
-            if not products or not isinstance(products, list):
-                return {"success": False, "error": "商品列表不能为空且必须是列表"}
+            # 先检查是否为列表类型（而不是检查空值）
+            if not isinstance(products, list):  # 先检查类型！
+                return {"success": False, "error": "商品必须是列表格式"}
+
+            # 再检查列表内容（允许空列表进入API层）
             for product in products:
                 if "product_id" not in product or "quantity" not in product:
-                    return {"success": False, "error": "每个商品必须包含 product_id 和 quantity 字段"}
+                    return {"success": False, "error": "商品缺少product_id或quantity字段"}
                 if not isinstance(product["quantity"], int) or product["quantity"] <= 0:
                     return {"success": False, "error": "商品数量必须是大于0的整数"}
-            return await self.order_api.create_order(user_id=user_id, products=products)
+
+            # 调用API（即使products=[]也传递）
+            return await self.order_api.create_order(user_id, products, address)
         except Exception as e:
             self.logger.error(f"创建订单失败: {str(e)}")
             return {"success": False, "error": str(e)}

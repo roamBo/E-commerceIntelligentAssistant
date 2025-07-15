@@ -31,7 +31,9 @@ prompt_template = ChatPromptTemplate.from_messages([
 3.  `search_products` 工具现在支持多种查询参数，包括名称、分类、品牌、价格范围、标签和库存状态。请根据用户需求，尽可能精确地使用这些参数。
 4.  如果 `search_products` 工具返回空结果，你必须明确告知用户“没有找到相关商品”。
 5.  在获得所有必要信息（需求分析、搜索关键词、商品详情）后，必须调用 `format_final_response` 工具来生成最终的、结构化的推荐报告。这是最后一步。
-6.  在生成的报告中，商品名称之后你应同步提供商品对应的id，并用product_id标明"""),
+6.  在生成的报告中，商品名称之后你应同步提供商品对应的id，并用product_id标明
+7.  在生成的报告中你也应该列出商品的价格信息
+8.  在调用search_products工具进行搜索时，返回空结果可能是因为当前选择的参数有错误，此时你被允许调整调用参数，重新搜索，最多可重新搜索三次"""),
     MessagesPlaceholder(variable_name="chat_history"),
     ("human", "{input}"),
     MessagesPlaceholder(variable_name="agent_scratchpad"),

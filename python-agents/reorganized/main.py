@@ -121,4 +121,4 @@ async def chat_endpoint(request: ChatRequest):
 
 # --- 运行 FastAPI 应用 ---
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8085) # 端口改为 8000，避免与之前 8085 冲突
+    uvicorn.run(app, host="0.0.0.0", port=8085)

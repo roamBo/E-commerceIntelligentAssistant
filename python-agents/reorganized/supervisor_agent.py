@@ -148,6 +148,14 @@ async def supervisor_router(state: AgentState) -> Dict[str, Any]:
         logger.info(f"Supervisor 路由决策结果: {route_decision.next}")
 
         updated_history = chat_history + [HumanMessage(content=user_input)]
+        last_message = chat_history[-1].content if chat_history else ""
+        if "请提供收货信息：" in last_message:
+            # 如果用户正在回复地址请求，强制路由到订单代理
+            logger.info("检测到地址补充信息，强制路由到 OrderAgent")
+            return {
+                "chat_history": chat_history + [HumanMessage(content=user_input)],
+                "next_agent": "order"
+            }
 
         if route_decision.next == "__end__":
             response_prompt = ChatPromptTemplate.from_messages([
