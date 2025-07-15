@@ -56,8 +56,8 @@ public class PaymentController {
                 ResponseEntity.notFound().build();
     }
 
-    @PatchMapping("/{id}/status")
-    public ResponseEntity<Payment> updatePaymentStatus(@PathVariable String id, @RequestBody String status) {
+    @PatchMapping("/{id}/{status}")
+    public ResponseEntity<Payment> updatePaymentStatus(@PathVariable String id, @PathVariable String status) {
         Payment updatedPayment = paymentService.updatePaymentStatus(id, status);
         return updatedPayment != null ?
                 ResponseEntity.ok(updatedPayment) :
