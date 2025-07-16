@@ -14,6 +14,21 @@ class FinalResponse(BaseModel):
     search_keyword: str = Field(..., description="根据用户需求确定的、用于调用search_products工具的搜索关键词")
     recommendations: List[Recommendation] = Field(..., description="基于搜索结果生成的商品推荐列表")
 
+class AddressInfo(BaseModel):
+    name: str = Field(..., description="收货人姓名")
+    phone: str = Field(..., description="收货人联系电话")
+    detail: str = Field(..., description="详细收货地址")
+
+class ProductOrderItem(BaseModel):
+    product_id: str = Field(..., description="商品ID")
+    quantity: int = Field(..., description="购买数量")
+
+class CreateOrderInput(BaseModel):
+    """用于 create_order 工具的输入模型"""
+    user_id: str = Field(..., description="用户唯一标识符")
+    address: AddressInfo = Field(..., description="收货地址信息")
+    products: List[ProductOrderItem] = Field(..., description="要购买的商品列表")
+
 # --- 外部商品 API 返回的数据结构 (示例) ---
 # 如果使用外部API，这个模型用于解析API返回的单个商品数据
 class Product(BaseModel):
