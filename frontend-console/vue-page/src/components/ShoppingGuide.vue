@@ -99,12 +99,12 @@
 
       <!-- 侧边快捷功能 -->
       <div class="side-panel">
-        <div class="side-card" @click="isLoggedIn && quickSend('帮我查一下我下了什么订单', true)" :class="{'disabled': !isLoggedIn}">
+        <div class="side-card" @click="isLoggedIn && quickSend('帮我查询我的所有订单')" :class="{'disabled': !isLoggedIn}">
           <div class="side-icon">🛒</div>
           <div class="side-title">订单查询</div>
           <div class="side-desc">一键查询我的所有订单</div>
         </div>
-        <div class="side-card" @click="isLoggedIn && quickSend('帮我查一下我要付多少钱')" :class="{'disabled': !isLoggedIn}">
+        <div class="side-card" @click="isLoggedIn && quickSend('帮我查询我的所有订单的应付金额')" :class="{'disabled': !isLoggedIn}">
           <div class="side-icon">💰</div>
           <div class="side-title">支付查询</div>
           <div class="side-desc">快速查看应付金额</div>
@@ -116,7 +116,10 @@
 
 <script setup>
 import { ref, nextTick, watch, onMounted, onBeforeUnmount, computed } from 'vue'
-// import ParticleAnimation from './ParticleAnimation.vue'
+import axios from 'axios'
+// 导入通信服务
+import commService from '../services/commService'
+import { orderApi } from '../services/api'
 
 const chatBody = ref(null)
 const inputField = ref(null)
@@ -133,6 +136,9 @@ const PARTICLE_RADIUS = [15, 25]
 const PARTICLE_SPEED = [0.1, 0.3]
 let particles = []
 const EMOJIS = ['🛒', '🎁', '💰', '🏷️', '📱', '💻', '👕', '👟', '⭐', '💳', '📦']
+
+// 会话ID
+const sessionId = ref(commService.generateSessionId())
 
 // 检查用户是否登录
 const isLoggedIn = computed(() => {
@@ -151,44 +157,81 @@ function goToLogin() {
   emit('goLogin')
 }
 
-function sendMsg() {
+async function sendMsg() {
   const text = input.value.trim()
   if (!text || isProcessing.value || !isLoggedIn.value) return
 
-  handleUserInput(text)
+  // 添加用户消息到聊天窗口
+  messages.value.push({ role: 'user', text })
   input.value = ''
   scrollToBottom()
-  focusInput()
-}
-
-function quickSend(text, isOrder) {
-  if (isProcessing.value || !isLoggedIn.value) return
-
-  handleUserInput(text, isOrder)
-  scrollToBottom()
-  focusInput()
-}
-
-function handleUserInput(text, isOrder) {
-  messages.value.push({ role: 'user', text })
-
-  // 添加思考状态
+  
+  // 设置处理中状态
   isProcessing.value = true
-
-  if (text.includes('订单')) {
-    fetchOrders()
-  } else if (text.includes('付钱') || text.includes('付多少')) {
-    fetchTotal()
-  } else {
-    setTimeout(() => {
-      messages.value.push({
-        role: 'bot',
-        text: '我们需要集成实际的API来处理您的请求。目前系统正在准备中，暂时无法处理具体业务。请稍后再试，或联系客服获取更多帮助。'
-      })
-      isProcessing.value = false
+  
+  try {
+      // 添加思考状态的消息
+      const thinkingIndex = messages.value.length
+      messages.value.push({ role: 'bot', thinking: true, text: '' })
       scrollToBottom()
-      focusInput()
-    }, 600)
+      
+      try {
+      // 调用通信服务的chatWithAgent方法，发送到comm_agent
+      const response = await commService.chatWithAgent(text, sessionId.value)
+        
+        // 替换思考状态为实际回复
+        messages.value[thinkingIndex] = {
+          role: 'bot',
+        text: response.response || response.message || response.text || JSON.stringify(response),
+          type: 'text'
+        }
+      } catch (error) {
+        console.error('调用通信服务失败:', error)
+        // 处理错误消息
+        let errorMessage = '很抱歉，商品推荐服务暂时不可用。请稍后再试。'
+        
+        // 如果是我们定义的格式化错误对象
+        if (error.message) {
+          errorMessage = error.message
+        }
+        
+        // 替换思考状态为错误消息
+        messages.value[thinkingIndex] = {
+          role: 'bot',
+          text: errorMessage,
+          error: true
+      }
+    }
+  } finally {
+    isProcessing.value = false
+    scrollToBottom()
+    focusInput()
+  }
+}
+
+function quickSend(text) {
+  if (isProcessing.value || !isLoggedIn.value) return
+  input.value = text
+  sendMsg()
+}
+
+async function fetchOrders() {
+  try {
+    // 直接发送消息给agent
+    await sendMsg('帮我查询我的所有订单')
+  } finally {
+    isProcessing.value = false
+    scrollToBottom()
+  }
+}
+
+async function fetchTotal() {
+  try {
+    // 直接发送消息给agent
+    await sendMsg('帮我查询我的所有订单的应付金额')
+  } finally {
+    isProcessing.value = false
+    scrollToBottom()
   }
 }
 
@@ -201,47 +244,13 @@ function focusInput() {
   })
 }
 
-function fetchOrders() {
-  // 模拟获取订单数据
-  setTimeout(() => {
-    const mockOrders = [
-      { name: '高性能笔记本电脑', count: 1, price: 6999 },
-      { name: '无线蓝牙耳机', count: 2, price: 499 },
-      { name: '智能手表', count: 1, price: 1299 }
-    ]
-
-    messages.value.push({
-      role: 'bot',
-      type: 'orders',
-      orders: mockOrders
-    })
-
-    isProcessing.value = false
-    scrollToBottom()
-    focusInput()
-  }, 800)
-}
-
-function fetchTotal() {
-  // 模拟获取订单总额
-  setTimeout(() => {
-    const total = 6999 + (499 * 2) + 1299
-    messages.value.push({
-      role: 'bot',
-      text: `您所有订单应付总金额为：¥${total}`
-    })
-
-    isProcessing.value = false
-    scrollToBottom()
-    focusInput()
-  }, 800)
-}
-
 // 清除聊天记录
 const clearChat = () => {
   messages.value = [
     { role: 'bot', text: '您好，有什么可以帮您？' }
   ]
+  // 重新生成会话ID
+  sessionId.value = commService.generateSessionId()
   focusInput()
 }
 
