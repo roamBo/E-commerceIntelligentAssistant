@@ -35,3 +35,6 @@ E-commerceIntelligentAssistant/
 │   └── k8s/                        # 生产部署配置  
 │  
 └── pom.xml                       
+## 三、部署
+docker-compose -f docker-compose.env.yml up
+docker compose -f docker-compose.service.yml up
