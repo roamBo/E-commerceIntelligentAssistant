@@ -6,14 +6,15 @@ import json
 import os
 from datetime import datetime
 from typing import Dict, Any, Optional, List
-
+from langchain_core.output_parsers import JsonOutputParser
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import BaseMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.agents import AgentExecutor, create_tool_calling_agent, Tool
 
-from config import Config
-from models import AgentState
+from reorganized.config import Config
+from reorganized.models import AgentState
+
 
 # ----------------------------------------------------------------------
 # 订单代理配置 (无变化)
@@ -23,13 +24,14 @@ class OrderConfig:
     SILICONFLOW_API_KEY: str = Config.SILICONFLOW_API_KEY
     SILICONFLOW_BASE_URL: str = Config.SILICONFLOW_API_BASE
     MODEL_NAME: str = Config.LLM_MODEL_NAME
+    Config.LLM_MODEL_NAME
     MODEL_TEMPERATURE: float = Config.LLM_TEMPERATURE
     MAX_TOKENS: int = 500
-    ORDER_SERVICE_BASE_URL: str = os.environ.get("ORDER_SERVICE_BASE_URL", "http://10.172.66.224:8084/order"  )
+    ORDER_SERVICE_BASE_URL: str = os.environ.get("ORDER_SERVICE_BASE_URL", "http://10.172.66.224:8084/order")
 
 
 # ----------------------------------------------------------------------
-# 订单服务 API 封装 (无变化)
+# 订单服务 API 封装 (修改)
 # ----------------------------------------------------------------------
 class OrderServiceAPI:
     """订单服务 API 封装"""
@@ -40,15 +42,16 @@ class OrderServiceAPI:
         self.session.timeout = 120
         self.logger = logging.getLogger(__name__)
 
-    async def create_order(self, user_id: str, products: List[Dict[str, Any]],address:str, status: str = "PENDING_PAYMENT") -> Dict[
-        str, Any]:
-        """创建新订单"""
+    async def create_order(self, user_id: str, items: List[Dict[str, Any]], shipping_address: str, total_amount: float,
+                           status: str = "PENDING_PAYMENT") -> Dict[str, Any]:
+        """创建新订单（修改为匹配数据库格式）"""
         url = f"{self.base_url}/api/orders"
         data = {
             "userId": user_id,
-            "products": products,
-            "status": status,
-            "address":address
+            "totalAmount": total_amount,
+            "shippingAddress": shipping_address,
+            "items": items,
+            "status": status
         }
         try:
             response = await asyncio.to_thread(self.session.post, url, json=data)
@@ -126,7 +129,7 @@ class OrderServiceAPI:
 
 
 # ----------------------------------------------------------------------
-# 订单代理工具函数 (核心修改部分)
+# 订单代理工具函数 (修改)
 # ----------------------------------------------------------------------
 def create_order_tool(order_agent):
     """创建订单工具"""
@@ -136,63 +139,124 @@ def create_order_tool(order_agent):
         return asyncio.run(_create_order(order_data))
 
     async def _create_order(order_data: str) -> str:
-        """创建新订单，参数为JSON格式字符串"""
         try:
-            # 添加更健壮的 JSON 解析
+            # 尝试解析JSON格式
             try:
                 data = json.loads(order_data)
             except json.JSONDecodeError:
-                return "❌ 参数格式错误：必须是有效的JSON格式"
+                # 如果不是JSON，尝试解析为自然语言地址格式
+                return await order_agent._handle_natural_language_order(order_data)
 
             # 检查必需字段
             required_fields = ["user_id", "products", "address"]
             missing = [field for field in required_fields if field not in data]
             if missing:
-                return f"❌ 缺少必要字段：{', '.join(missing)}"
+                return f"❌❌ 缺少必要字段：{', '.join(missing)}"
 
-            # 获取参数（添加默认值防止None）
-            user_id = data.get("user_id", "").strip()
-            products = data.get("products", [])  # 默认空列表
+            # 获取参数（安全处理）
+            user_id = data.get("user_id", "")
+            if isinstance(user_id, int):
+                user极 = str(user_id)
+            elif isinstance(user_id, str):
+                user_id = user_id.strip()
+            else:
+                return "❌❌ 无效的用户ID格式"
+
+            products = data.get("products", [])
             address = data.get("address", "")
 
-            # 处理地址（兼容字典/字符串）
+            # 检查地址不能为空
+            if not address:
+                return "❌❌ 收货地址不能为空"
+
+            # 统一地址格式为字符串
             if isinstance(address, dict):
-                address_str = f"{address.get('name', '')}，{address.get('phone', '')}，{address.get('detail', '')}"
+                required_keys = ["name", "phone", "detail"]
+                if not all(key in address for key in required_keys):
+                    return "❌❌ 地址字典缺少必要字段：name, phone, detail"
+                address_str = f"{address['name']}，{address['phone']}，{address['detail']}"
             else:
                 address_str = str(address).strip()
+                if not address_str:
+                    return "❌❌ 收货地址不能为空"
 
-            # 提前验证商品列表（防止进入create_order才报错）
-            if not isinstance(products, list):
-                return "❌ 商品列表必须是数组格式"
+            # 检查商品列表不能为空
             if len(products) == 0:
-                return "❌ 商品列表不能为空"
+                return "❌❌ 商品列表不能为空"
 
-            # 调用服务（使用字符串地址）
-            result = await order_agent.create_order(user_id, products, address_str)
+            # 标准化商品格式并计算总金额
+            valid_items = []
+            total_amount = 0.0
+            for item in products:
+                # 处理字符串格式的商品
+                if isinstance(item, str):
+                    try:
+                        parsed_item = json.loads(item)
+                        if "product_id" in parsed_item:
+                            item = parsed_item
+                    except:
+                        item = {"product_id": item, "quantity": 1}
+
+                # 确保商品有product_id字段
+                if "product_id" not in item:
+                    return f"❌❌ 商品缺少product_id字段: {item}"
+
+                # 处理整数类型的product_id
+                product_id = str(item["product_id"]) if isinstance(item["product_id"], int) else item["product_id"]
+
+                # 获取单价和数量
+                unit_price = float(item.get("unit_price", 0.0))
+                quantity = int(item.get("quantity", 1))
+                item_amount = unit_price * quantity
+
+                # 创建数据库格式的商品项
+                valid_item = {
+                    "productId": product_id,
+                    "productName": item.get("product_name", f"产品{product_id}"),
+                    "quantity": quantity,
+                    "unitPrice": unit_price
+                }
+
+                valid_items.append(valid_item)
+                total_amount += item_amount
+
+            # 调用服务
+            result = await order_agent.create_order(
+                user_id,
+                valid_items,
+                address_str,
+                total_amount
+            )
+
             if result["success"]:
                 return f"订单创建成功：{json.dumps(result['data'], ensure_ascii=False)}"
             else:
                 return f"订单创建失败：{result['error']}"
+
         except Exception as e:
             return f"创建订单时发生错误：{str(e)}"
 
+    # 修复：添加了缺少的func和coro参数
     return Tool(
         name="create_order",
-        func=_create_order_sync, # 【修改】提供一个同步函数
-        coro=_create_order,      # 【修改】同时提供异步函数
-        description="创建新订单。输入必须是包含 user_id address(字符串或{name,phone,detail}字典)和 products列表的JSON字符串。"
+        func=_create_order_sync,
+        coro=_create_order,
+        description=(
+            "创建新订单。输入必须是包含以下字段的JSON字符串：\n"
+            "- user_id: 用户ID\n"
+            "- products: 商品列表，每个商品必须包含 product_id, quantity, unit_price\n"
+            "- address: 字符串或 {name, phone, detail} 字典\n"
+            "示例：{'user_id':'U123', 'products':[{'product_id':'P456','quantity':2,'unit_price':2499}], ...}"
+        )
     )
-
 
 def get_order_by_id_tool(order_agent):
     """根据ID获取订单工具"""
 
     def _get_order_by_id_sync(order_id: str) -> str:
-        """同步包装器"""
         return asyncio.run(_get_order_by_id(order_id))
 
     async def _get_order_by_id(order_id: str) -> str:
-        """根据订单ID获取订单信息"""
         try:
             result = await order_agent.get_order_by_id(order_id.strip())
             if result["success"]:
@@ -204,8 +268,8 @@ def get_order_by_id_tool(order_agent):
 
     return Tool(
         name="get_order_by_id",
-        func=_get_order_by_id_sync, # 【修改】提供一个同步函数
-        coro=_get_order_by_id,      # 【修改】同时提供异步函数
+        func=_get_order_by_id_sync,
+        coro=_get_order_by_id,
         description="根据订单ID获取订单信息，参数：订单ID"
     )
 
@@ -230,8 +294,8 @@ def get_orders_by_user_tool(order_agent):
 
     return Tool(
         name="get_orders_by_user",
-        func=_get_orders_by_user_sync, # 【修改】提供一个同步函数
-        coro=_get_orders_by_user,      # 【修改】同时提供异步函数
+        func=_get_orders_by_user_sync,
+        coro=_get_orders_by_user,
         description="根据用户ID获取所有订单，参数：用户ID"
     )
 
@@ -275,8 +339,8 @@ def update_order_status_tool(order_agent):
 
     return Tool(
         name="update_order_status",
-        func=_update_order_status_sync, # 【修改】提供一个同步函数
-        coro=_update_order_status,      # 【修改】同时提供异步函数
+        func=_update_order_status_sync,
+        coro=_update_order_status,
         description="更新订单状态。输入必须是包含 order_id 和 status 的JSON字符串。"
     )
 
@@ -307,14 +371,14 @@ def cancel_order_tool(order_agent):
 
     return Tool(
         name="cancel_order",
-        func=_cancel_order_sync, # 【修改】提供一个同步函数
-        coro=_cancel_order,      # 【修改】同时提供异步函数
+        func=_cancel_order_sync,
+        coro=_cancel_order,
         description="取消一个订单，参数：订单ID"
     )
 
 
 # ----------------------------------------------------------------------
-# 订单代理主类 (无变化)
+# 订单代理主类 (修改)
 # ----------------------------------------------------------------------
 class OrderAgent:
     """
@@ -347,10 +411,16 @@ class OrderAgent:
         )
 
         # 初始化工具
-        tools = self._get_order_tools()
+        tools = [
+            create_order_tool(self),
+            get_order_by_id_tool(self),
+            get_orders_by_user_tool(self),
+            update_order_status_tool(self),
+            cancel_order_tool(self)
+        ]
 
         prompt = ChatPromptTemplate.from_messages([
-            ("system", """你是专业的订单助手。你的核心任务是根据用户的指令和对话历史，调用工具来处理订单。
+            ("system", """你是专业的订单助手。你的核心任务是根据用户的指令和对话极史，调用工具来处理订单。
 
         **工作流程:**
         1.  **分析意图**: 仔细分析用户的最新输入和完整的对话历史，理解用户的具体需求。
@@ -362,13 +432,17 @@ class OrderAgent:
                 • 详细收货地址（省市区+街道门牌号）
             -   如果缺少任何信息，必须明确要求用户提供
         3.  **调用工具**: 使用提取的信息调用创建订单工具
-        4.  **响应用户**: 根据工具结果生成回复
+        4.  **订单金额**：从对话历史中提取
+        5.  **响应用户**: 根据工具结果生成回复
 
         **重要规则:**
         - 收货地址必须是完整的省市区+街道门牌号
+        -当调用工具函数时打印出使用了哪个工具函数
+        -从对话历史中计算订单金额并正确记录
+        -当用户要求查询自己的所有订单信息时，优先调用工具函数查询，而不是从chathistory中解析。
         - 如果用户未提供收货信息，返回固定格式提示：
           "请提供收货信息：[姓名]，[电话]，[完整地址]"
-        - 绝不虚构信息"""),  # <-- 这里是修改后的提示词
+        - 绝不虚构信息"""),
             MessagesPlaceholder(variable_name="chat_history"),
             ("human", "User ID: {user_id}\nUser Request: {input}"),
             MessagesPlaceholder(variable_name="agent_scratchpad"),
@@ -389,16 +463,6 @@ class OrderAgent:
         )
 
         print("OrderAgent initialized with a stateless executor and updated prompt.")
-
-    def _get_order_tools(self):
-        """获取订单工具列表"""
-        return [
-            create_order_tool(self),
-            get_order_by_id_tool(self),
-            get_orders_by_user_tool(self),
-            update_order_status_tool(self),
-            cancel_order_tool(self)
-        ]
 
     async def process_message(self, user_input: str, session_id: str, user_id: str,
                               chat_history: List[BaseMessage]) -> str:
@@ -428,85 +492,239 @@ class OrderAgent:
             return error_msg
 
     # ----------------------------------------------------------------------
-    # 业务逻辑方法 (无变化)
+    # 业务逻辑方法 (修改)
     # ----------------------------------------------------------------------
-    async def create_order(self, user_id: str,address:str, products: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """创建新订单"""
+    async def create_order(
+            self,
+            user_id: str,
+            items: List[Dict[str, Any]],  # 商品列表
+            shipping_address: str,  # 地址
+            total_amount: float  # 总金额
+    ) -> Dict[str, Any]:
+        """创建新订单（修正参数顺序）"""
         try:
-            # 先检查是否为列表类型（而不是检查空值）
-            if not isinstance(products, list):  # 先检查类型！
-                return {"success": False, "error": "商品必须是列表格式"}
-
-            # 再检查列表内容（允许空列表进入API层）
-            for product in products:
-                if "product_id" not in product or "quantity" not in product:
-                    return {"success": False, "error": "商品缺少product_id或quantity字段"}
-                if not isinstance(product["quantity"], int) or product["quantity"] <= 0:
-                    return {"success": False, "error": "商品数量必须是大于0的整数"}
-
-            # 调用API（即使products=[]也传递）
-            return await self.order_api.create_order(user_id, products, address)
+            # 调用API（匹配数据库格式）
+            return await self.order_api.create_order(
+                user_id,
+                items,
+                shipping_address,
+                total_amount
+            )
         except Exception as e:
             self.logger.error(f"创建订单失败: {str(e)}")
             return {"success": False, "error": str(e)}
 
     async def get_order_by_id(self, order_id: str) -> Dict[str, Any]:
         """根据订单ID获取订单信息"""
-        try:
-            return await self.order_api.get_order_by_id(order_id)
-        except Exception as e:
-            self.logger.error(f"获取订单信息失败: {str(e)}")
-            return {"success": False, "error": str(e)}
+        return await self.order_api.get_order_by_id(order_id)
 
     async def get_orders_by_user(self, user_id: str) -> Dict[str, Any]:
         """获取用户的所有订单"""
-        try:
-            return await self.order_api.get_orders_by_user(user_id)
-        except Exception as e:
-            self.logger.error(f"获取用户订单失败: {str(e)}")
-            return {"success": False, "error": str(e)}
+        return await self.order_api.get_orders_by_user(user_id)
 
     async def update_order_status(self, order_id: str, status: str) -> Dict[str, Any]:
         """更新订单状态"""
+        return await self.order_api.update_order_status(order_id, status)
+
+    async def _handle_natural_language_order(self, input_text: str) -> str:
+        """处理自然语言格式的订单信息"""
+        from langchain_core.output_parsers import JsonOutputParser
+        from langchain_core.prompts import ChatPromptTemplate
+
+        prompt = ChatPromptTemplate.from_messages([
+            ("system",
+             "将用户输入解析为结构化订单数据。注意："
+             "1. 商品字段可能是数组或单个商品对象\n"
+             "2. 单个商品格式: {'product_id':'..','quantity':1}\n"
+             "3. 自动为缺失quantity字段补默认值1\n"
+             "4. 必须提取总金额(total_amount)\n"  # 新增金额提取要求
+             "5. 输出必须是JSON格式，包含user_id, products, address, total_amount字段")  # 增加金额字段
+        ])
+
+        llm = ChatOpenAI(
+            model=self.config.MODEL_NAME,
+            temperature=0,
+            api_key=self.config.SILICONFLOW_API_KEY,
+            base_url=self.config.SILICONFLOW_BASE_URL
+        )
+        parser = JsonOutputParser()
+
         try:
-            valid_statuses = ["PAID", "DELIVERED", "FINISHED", "CANCELLED"]
-            if status not in valid_statuses:
-                return {"success": False, "error": f"无效的状态值，有效状态: {', '.join(valid_statuses)}"}
-            return await self.order_api.update_order_status(order_id, status)
+            # 解析自然语言输入
+            chain = prompt | llm | parser
+            structured_data = await chain.ainvoke({"input": input_text})
+            self.logger.info(f"自然语言解析结果：{structured_data}")
+            if not structured_data.get("products"):
+                return "❌ 解析失败：未识别到商品信息"
+
+            if not structured_data.get("address"):
+                return "❌ 解析失败：未识别到收货地址"
+                # +++ 新增：直接使用结构化数据中的单价 +++
+                valid_items = []
+                total_amount = 0.0
+                for item in structured_data["products"]:  # 直接使用已解析数据
+                    unit_price = float(item["unit_price"])  # 确保单价存在
+                    quantity = int(item.get("quantity", 1))
+
+                    valid_item = {
+                        "productId": str(item["product_id"]),
+                        "productName": item.get("product_name", f"产品{item['product_id']}"),
+                        "quantity": quantity,
+                        "unitPrice": unit_price  # 确保传递单价
+                    }
+                    valid_items.append(valid_item)
+                    total_amount += unit_price * quantity  # 计算总金额
+
+                # 调用服务时传递计算的总金额
+                result = await self.create_order(
+                    structured_data["user_id"],
+                    valid_items,
+                    address_str,
+                    total_amount  # 关键修复点
+                )
+
+            # 递归调用创建订单方法
+            return await self._create_order_from_nlp(structured_data)
+
         except Exception as e:
-            self.logger.error(f"更新订单状态失败: {str(e)}")
-            return {"success": False, "error": str(e)}
+            return f"❌ 订单解析失败：{str(e)}"
 
-    def get_order_help(self) -> str:
-        """获取订单帮助信息"""
-        help_text = f"""
-        订单代理功能说明：
+    async def _create_order_from_nlp(self, structured_data: dict) -> str:
+        """处理从自然语言解析出的结构化数据（添加金额提取与验证）"""
+        try:
+            # 确保所有必要字段都存在
+            required_fields = ["user_id", "products", "address"]
+            missing = [field for field in required_fields if field not in structured_data]
+            if missing:
+                return f"❌❌ 缺少必要字段：{', '.join(missing)}"
 
-        核心功能：
-        1. 创建新订单
-        2. 根据订单ID查询订单详情
-        3. 查询用户的订单列表
-        4. 更新订单状态
-        5. 取消订单
+            # 获取地址信息
+            address = structured_data["address"]
+            if not address:
+                return "❌❌ 收货地址不能为空"
 
-        订单状态流程：
-        - PENDING_PAYMENT (待支付) → PAID (已支付) → DELIVERED (已发货) → FINISHED (已完成)
-        - 待支付和已支付状态的订单可以取消(CANCELLED)
+            # 统一地址格式为字符串
+            if isinstance(address, dict):
+                # 确保字典包含必要字段
+                required_keys = ["name", "phone", "detail"]
+                if not all(key in address for key in required_keys):
+                    return "❌❌ 地址字典缺少必要字段：name, phone, detail"
+                address_str = f"{address['name']}，{address['phone']}，{address['detail']}"
+            else:
+                address_str = str(address).strip()
+                if not address_str:
+                    return "❌❌ 收货地址不能为空"
 
-        数据字段规范：
-        - 订单ID: order_id
-        - 用户ID: user_id
-        - 商品列表: products (格式: [{{"product_id": "商品ID", "quantity": 数量}}])
-        - 订单状态: status
+            # 处理商品列表
+            products = structured_data["products"]
+            if not products:
+                return "❌❌ 商品列表不能为空"
 
-        注意：
-        - 创建订单需要用户ID和商品列表
-        - 状态更新必须遵循状态流程规则
-        - 只能取消待支付或已支付的订单
-        - 此代理集成了大模型理解能力，能够智能解析用户自然语言输入
-        - 与微服务API数据格式完全一致
-        """
-        return help_text
+            # 场景1：用户输入的是单一商品字典
+            if isinstance(products, dict):
+                products = [products]  # 包装成列表
+
+            # 场景2：用户输入的是字符串格式商品ID
+            elif isinstance(products, str):
+                try:
+                    # 尝试解析为JSON
+                    products = json.loads(products)
+                except:
+                    # 非JSON字符串：视为单一商品ID
+                    products = [{"product_id": products, "quantity": 1}]
+
+            # 验证商品列表类型
+            if not isinstance(products, list):
+                return "❌❌ 商品列表必须是数组格式"
+
+            # ========== 金额提取与验证 ==========
+            # 1. 尝试从结构化数据中提取总金额
+            total_amount = 0.0
+            if 'total_amount' in structured_data:
+                try:
+                    total_amount = float(structured_data['total_amount'])
+                    self.logger.info(f"从解析数据提取总金额: ¥{total_amount:.2f}")
+                except (TypeError, ValueError):
+                    self.logger.warning("无法转换total_amount为数字，将使用0.0")
+                    total_amount = 0.0
+
+            # 2. 计算商品实际总金额
+            calculated_amount = 0.0
+            valid_items = []
+            for item in products:
+                # 确保商品有product_id字段
+                if "product_id" not in item:
+                    return f"❌❌ 商品缺少product_id字段: {item}"
+
+                # 处理整数类型的product_id
+                product_id = str(item["product_id"]) if isinstance(item["product_id"], int) else item["product_id"]
+
+                # 获取单价和数量
+                unit_price = float(item.get("unit_price", 0.0))
+                quantity = int(item.get("quantity", 1))
+
+                # 创建数据库格式的商品项
+                valid_item = {
+                    "productId": product_id,
+                    "productName": item.get("product_name", f"产品{product_id}"),
+                    "quantity": quantity,
+                    "unitPrice": unit_price
+                }
+                valid_items.append(valid_item)
+
+                # 累加计算金额
+                item_total = unit_price * quantity
+                calculated_amount += item_total
+                self.logger.info(f"商品计算: {product_id} × {quantity} @ ¥{unit_price:.2f} = ¥{item_total:.2f}")
+
+            self.logger.info(f"商品总金额计算: ¥{calculated_amount:.2f}")
+
+            # 3. 金额验证与决策
+            if total_amount > 0:
+                # 存在解析金额时进行验证
+                if abs(total_amount - calculated_amount) > 0.01:  # 考虑浮点精度
+                    amount_difference = abs(total_amount - calculated_amount)
+                    percentage_diff = abs(total_amount - calculated_amount) / total_amount
+
+                    if percentage_diff > 0.1:  # 差异超过10%
+                        error_msg = (f"❌❌ 金额不一致：解析金额¥{total_amount:.2f} "
+                                     f"与商品总价¥{calculated_amount:.2f}不符，差异{percentage_diff:.2%}")
+                        self.logger.error(error_msg)
+                        return error_msg
+                    else:
+                        self.logger.warning(f"金额差异在可接受范围（{amount_difference:.2f}），使用解析金额")
+                        final_amount = total_amount
+                else:
+                    self.logger.info("金额一致，使用解析金额")
+                    final_amount = total_amount
+            else:
+                self.logger.info("未解析到金额，使用计算金额")
+                final_amount = calculated_amount
+
+            # 最终金额验证
+            if final_amount <= 0:
+                return "❌❌ 订单金额必须大于0"
+
+            self.logger.info(f"最终使用金额: ¥{final_amount:.2f}")
+            # ========== 结束金额处理 ==========
+
+            # 调用创建订单服务
+            result = await self.create_order(
+                structured_data["user_id"],
+                valid_items,  # 商品列表
+                address_str,  # 地址
+                final_amount  # 总金额 - 确保传递
+            )
+
+            if result["success"]:
+                # 在响应中包含金额信息
+                order_data = result['data']
+                order_data['totalAmount'] = final_amount  # 确保响应包含正确金额
+                return f"订单创建成功：{json.dumps(order_data, ensure_ascii=False)}"
+            else:
+                return f"订单创建失败：{result['error']}"
+        except Exception as e:
+            return f"创建订单时发生错误：{str(e)}"
 
 
 # ----------------------------------------------------------------------
