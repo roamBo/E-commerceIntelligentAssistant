@@ -90,6 +90,24 @@ const paymentService = {
   },
   
   /**
+   * 根据用户ID获取支付记录
+   * @param {string} userId - 用户ID
+   * @returns {Promise} 支付记录列表
+   */
+  getPaymentsByUserId: async (userId) => {
+    try {
+      const response = await apiClient.get(`/payments/user/${userId}`);
+      return response.data;
+    } catch (error) {
+      console.error(`获取用户 ${userId} 的支付记录失败:`, error);
+      throw {
+        message: '获取用户支付记录失败，请稍后再试',
+        originalError: error
+      };
+    }
+  },
+  
+  /**
    * 创建支付记录
    * @param {Object} paymentData - 支付数据
    * @returns {Promise} 创建的支付记录
@@ -146,6 +164,113 @@ const paymentService = {
         name: '智能音箱 Pro',
         quantity: 1,
         unitPrice: 99.99
+      }
+    };
+  },
+
+  /**
+   * 轮询检查用户支付状态变化
+   * @param {string} userId - 用户ID
+   * @param {function} onStatusChange - 状态变化时的回调函数，参数为变化的支付记录
+   * @param[object Object]number} interval - 轮询间隔，单位毫秒，默认500ms
+   * @returns {Object} - 包含stop方法的控制对象，用于停止轮询
+   */
+  pollPaymentStatusChanges: (userId, onStatusChange, interval =500) => {
+    if (!userId) {
+      console.error('轮询支付状态需要用户ID');
+      return { stop: () => {}};
+    }
+    
+    console.log(`开始轮询用户 ${userId} 的支付状态变化，间隔 ${interval}ms`);
+    
+    // 存储上一次的支付记录状态
+    let previousPayments = {};
+    let timerId = null;
+    let isFirstPoll = true;
+    let pollCount = 0;
+    
+    // 执行轮询
+    const poll = async () => {
+      pollCount++;
+      console.log(`执行第 ${pollCount} 次轮询检查，用户ID: ${userId}`);
+      
+      try {
+        // 直接使用API调用获取支付记录
+        console.log(`请求URL: http://10.172.66.224:8084/payment/api/payments/user/${userId}`);
+        const response = await fetch(`http://10.172.66.224:8084/payment/api/payments/user/${userId}`);
+        if (!response.ok) {
+          throw new Error(`API返回错误状态码: ${response.status}`);
+        }
+        
+        const payments = await response.json();
+        console.log(`获取到 ${payments.length} 条支付记录:`, payments);
+        
+        if (isFirstPoll) {
+          // 首次轮询，记录所有支付状态
+          console.log('首次轮询，记录初始状态');
+          payments.forEach(payment => {
+            previousPayments[payment.id] = payment.status;
+            console.log(`记录支付 ${payment.id} 初始状态: ${payment.status}`);
+          });
+          isFirstPoll = false;
+        } else {
+          // 检查状态变化
+          let hasStatusChange = false;
+          
+          payments.forEach(payment => {
+            const prevStatus = previousPayments[payment.id];
+            const currentStatus = payment.status;
+            
+            console.log(`检查支付记录 ${payment.id}: 之前状态=${prevStatus}, 当前状态=${currentStatus}`);
+            
+            // 如果是新支付记录或状态发生变化
+            if (prevStatus === undefined || prevStatus !== currentStatus) {
+              hasStatusChange = true;
+              console.log(`支付记录 ${payment.id} 状态变化: ${prevStatus || '新记录'} -> ${currentStatus}`);
+              
+              // 特别检查从PENDING到SUCCESS的变化
+              if ((prevStatus === 'PENDING' || prevStatus === 'pending') && 
+                  (currentStatus === 'SUCCESS' || currentStatus === 'success')) {
+                console.log(`检测到支付记录 ${payment.id} 从未支付变为已支付状态`);
+                // 调用回调函数
+                onStatusChange(payment, 'PENDING_TO_SUCCESS');
+              } else if (prevStatus === undefined) {
+                // 新支付记录
+                console.log(`检测到新支付记录: ${payment.id}, 状态: ${currentStatus}`);
+                onStatusChange(payment, 'NEW_PAYMENT');
+              } else if (prevStatus !== currentStatus) {
+                // 其他状态变化
+                console.log(`检测到支付状态变化: ${prevStatus} -> ${currentStatus}`);
+                onStatusChange(payment, 'STATUS_CHANGED');
+              }
+            }
+            
+            // 更新状态记录
+            previousPayments[payment.id] = currentStatus;
+          });
+          
+          if (!hasStatusChange) {
+            console.log('本次轮询未检测到状态变化');
+          }
+        }
+      } catch (error) {
+        console.error('轮询支付状态时出错:', error);
+      }
+      
+      // 继续轮询
+      timerId = setTimeout(poll, interval);
+    };
+    
+    // 立即开始第一次轮询
+    poll();
+    
+    // 返回控制对象
+    return {
+      stop: () => {
+        if (timerId) {
+          clearTimeout(timerId);
+          console.log(`停止轮询用户 ${userId} 的支付状态`);
+        }
       }
     };
   }

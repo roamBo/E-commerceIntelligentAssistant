@@ -16,13 +16,23 @@
       <div class="chat-container">
         <div class="chat-header">
           <h2>个性化导购助手</h2>
-          <el-button
-              v-if="messages.length > 0"
-              type="text"
-              icon="el-icon-delete"
-              @click="clearChat"
-              class="clear-btn"
-          >清除对话</el-button>
+          <div class="header-actions">
+            <el-button
+                v-if="isLoggedIn"
+                type="text"
+                icon="el-icon-connection"
+                @click="testConnection"
+                class="test-btn"
+                :loading="isConnectionTesting"
+            >测试连接</el-button>
+            <el-button
+                v-if="messages.length > 0"
+                type="text"
+                icon="el-icon-delete"
+                @click="clearChat"
+                class="clear-btn"
+            >清除对话</el-button>
+          </div>
         </div>
         <div class="chat-body" ref="chatBody">
           <!-- 欢迎消息 -->
@@ -128,6 +138,7 @@ const messages = ref([
 ])
 const input = ref('')
 const isProcessing = ref(false)
+const isConnectionTesting = ref(false)
 const bgCanvas = ref(null)
 let animationId = null
 const PARTICLE_NUM = 15
@@ -177,12 +188,19 @@ async function sendMsg() {
       
       try {
       // 调用通信服务的chatWithAgent方法，发送到comm_agent
+      console.log('发送消息到代理:', {
+        text: text,
+        sessionId: sessionId.value,
+        userId: localStorage.getItem('loginUser') ? JSON.parse(localStorage.getItem('loginUser')).id || 'unknown' : 'unknown'
+      })
+      
       const response = await commService.chatWithAgent(text, sessionId.value)
+      console.log('代理返回数据:', response)
         
         // 替换思考状态为实际回复
         messages.value[thinkingIndex] = {
           role: 'bot',
-        text: response.response || response.message || response.text || JSON.stringify(response),
+          text: response.response || response.message || response.text || JSON.stringify(response),
           type: 'text'
         }
       } catch (error) {
@@ -193,6 +211,40 @@ async function sendMsg() {
         // 如果是我们定义的格式化错误对象
         if (error.message) {
           errorMessage = error.message
+        }
+        
+        // 如果有原始错误对象，尝试获取更多信息
+        if (error.originalError && error.originalError.response) {
+          const responseData = error.originalError.response.data
+          console.log('服务器错误详情:', responseData)
+          
+          // 显示服务器返回的详细错误信息
+          if (responseData && typeof responseData === 'object') {
+            let detailMessage = ''
+            if (responseData.detail) {
+              detailMessage = responseData.detail
+            } else if (responseData.message) {
+              detailMessage = responseData.message
+            } else if (responseData.error) {
+              detailMessage = responseData.error
+            } else {
+              try {
+                detailMessage = JSON.stringify(responseData)
+              } catch (e) {
+                detailMessage = '未知错误'
+              }
+            }
+            
+            errorMessage += `\n详细信息: ${detailMessage}`
+            
+            // 如果是服务器内部错误，添加更多信息
+            if (error.originalError.response.status === 500) {
+              errorMessage += '\n这可能是由于服务器内部错误导致的，请联系管理员并提供以下信息：'
+              if (responseData.timestamp) errorMessage += `\n时间: ${responseData.timestamp}`
+              if (responseData.path) errorMessage += `\n路径: ${responseData.path}`
+              if (responseData.requestId) errorMessage += `\n请求ID: ${responseData.requestId}`
+            }
+          }
         }
         
         // 替换思考状态为错误消息
@@ -252,6 +304,61 @@ const clearChat = () => {
   // 重新生成会话ID
   sessionId.value = commService.generateSessionId()
   focusInput()
+}
+
+// 测试与服务器的连接
+async function testConnection() {
+  if (isConnectionTesting.value) return
+  
+  isConnectionTesting.value = true
+  
+  try {
+    // 添加测试消息
+    const testIndex = messages.value.length
+    messages.value.push({ 
+      role: 'bot', 
+      text: '正在测试与服务器的连接...', 
+      type: 'system' 
+    })
+    scrollToBottom()
+    
+    // 调用测试连接方法
+    const result = await commService.testConnection()
+    
+    // 更新测试结果消息
+    if (result.success) {
+      messages.value[testIndex] = {
+        role: 'bot',
+        text: '✅ 连接测试成功！服务器正常运行。',
+        type: 'system'
+      }
+    } else {
+      let errorMsg = '❌ 连接测试失败。'
+      if (result.message) {
+        errorMsg += `\n${result.message}`
+      }
+      
+      messages.value[testIndex] = {
+        role: 'bot',
+        text: errorMsg,
+        type: 'system',
+        error: true
+      }
+    }
+  } catch (error) {
+    console.error('测试连接时发生错误:', error)
+    
+    // 添加错误消息
+    messages.value.push({
+      role: 'bot',
+      text: `❌ 测试连接时发生错误: ${error.message || '未知错误'}`,
+      type: 'system',
+      error: true
+    })
+  } finally {
+    isConnectionTesting.value = false
+    scrollToBottom()
+  }
 }
 
 // 格式化消息，处理换行和链接
@@ -439,11 +546,16 @@ html, body, #app {
   100% { opacity: 0.5; }
 }
 
-.clear-btn {
+.header-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.clear-btn, .test-btn {
   color: #409eff;
 }
 
-.clear-btn:hover {
+.clear-btn:hover, .test-btn:hover {
   color: #66b1ff;
 }
 
