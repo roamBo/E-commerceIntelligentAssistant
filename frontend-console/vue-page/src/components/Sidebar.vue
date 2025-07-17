@@ -91,11 +91,8 @@ const menuItems = [
   {
     index: 'order',
     label: '订单智能管家'
-  },
-  {
-    index: 'payment',
-    label: '智能支付系统(测试)'
   }
+  // '智能支付系统(测试)' 已移除
 ]
 
 const emit = defineEmits(['change', 'login'])
