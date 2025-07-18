@@ -49,7 +49,10 @@ const commService = {
   async chatWithAgent(userInput, sessionId, agentType = 'shopping') {
     try {
       // 添加用户ID，按照API要求的格式
-      const userId = this.getUserId();
+      let userId = this.getUserId();
+      userId = String(userId);
+      // console.log('commService chatWithAgent userId:', userId);
+      // console.log('commService chatWithAgent userId typeof:', typeof userId);
       
       const response = await apiClient.post('/chat', {
         user_input: userInput,
@@ -107,7 +110,7 @@ const commService = {
       const loginUser = localStorage.getItem('loginUser');
       if (loginUser) {
         const user = JSON.parse(loginUser);
-        return user.id || user.userId || 'default_user';
+        return user.userID;
       }
       return 'default_user';
     } catch (e) {
@@ -125,7 +128,8 @@ const commService = {
    */
   async getOrders(sessionId) {
     try {
-      const userId = this.getUserId();
+      let userId = this.getUserId();
+      userId = String(userId);
       const response = await apiClient.post('/chat', {
         user_input: '查询我的订单',
         session_id: sessionId,
@@ -150,7 +154,8 @@ const commService = {
    */
   async getPaymentInfo(sessionId) {
     try {
-      const userId = this.getUserId();
+      let userId = this.getUserId();
+      userId = String(userId);
       const response = await apiClient.post('/chat', {
         user_input: '查询我的支付信息',
         session_id: sessionId,

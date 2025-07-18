@@ -130,6 +130,7 @@ const messages = ref([
 ])
 const input = ref('')
 const isProcessing = ref(false)
+const isConnectionTesting = ref(false)
 const bgCanvas = ref(null)
 let animationId = null
 const PARTICLE_NUM = 15
@@ -295,6 +296,61 @@ const clearChat = () => {
   // 重新生成会话ID
   sessionId.value = commService.generateSessionId()
   focusInput()
+}
+
+// 测试与服务器的连接
+async function testConnection() {
+  if (isConnectionTesting.value) return
+  
+  isConnectionTesting.value = true
+  
+  try {
+    // 添加测试消息
+    const testIndex = messages.value.length
+    messages.value.push({ 
+      role: 'bot', 
+      text: '正在测试与服务器的连接...', 
+      type: 'system' 
+    })
+    scrollToBottom()
+    
+    // 调用测试连接方法
+    const result = await commService.testConnection()
+    
+    // 更新测试结果消息
+    if (result.success) {
+      messages.value[testIndex] = {
+        role: 'bot',
+        text: '✅ 连接测试成功！服务器正常运行。',
+        type: 'system'
+      }
+    } else {
+      let errorMsg = '❌ 连接测试失败。'
+      if (result.message) {
+        errorMsg += `\n${result.message}`
+      }
+      
+      messages.value[testIndex] = {
+        role: 'bot',
+        text: errorMsg,
+        type: 'system',
+        error: true
+      }
+    }
+  } catch (error) {
+    console.error('测试连接时发生错误:', error)
+    
+    // 添加错误消息
+    messages.value.push({
+      role: 'bot',
+      text: `❌ 测试连接时发生错误: ${error.message || '未知错误'}`,
+      type: 'system',
+      error: true
+    })
+  } finally {
+    isConnectionTesting.value = false
+    scrollToBottom()
+  }
 }
 
 // 格式化消息，处理换行和链接
